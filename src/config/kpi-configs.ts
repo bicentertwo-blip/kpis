@@ -851,7 +851,7 @@ export const SATISFACCION_CONFIG: KpiDefinition = {
   name: 'Satisfacción Cliente',
   shortName: 'Satisfacción',
   description: 'NPS por categoría, quejas y clima laboral.',
-  icon: 'Smiley',
+  icon: 'Smile',
   accent: 'from-pink-50/80 via-white/60 to-red-100/60',
   summaries: [
     {
