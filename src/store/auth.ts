@@ -3,9 +3,6 @@ import { persist } from 'zustand/middleware'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/types/auth'
-import { FIRST_USER_DEFAULT_VIEWS } from '@/utils/constants'
-
-type ProfileInsert = Omit<Profile, 'id'> & { id?: string }
 
 interface AuthStoreState {
   session: Session | null
@@ -30,8 +27,9 @@ const ensureProfile = async (user: User): Promise<Profile> => {
   }
 
   // Check if there's already a pending operation for this user
-  if (profileLocks[user.id]) {
-    return profileLocks[user.id]
+  const existingLock = profileLocks[user.id]
+  if (existingLock) {
+    return existingLock
   }
 
   // Create a lock for this user

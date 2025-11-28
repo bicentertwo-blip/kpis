@@ -1,4 +1,4 @@
-import type { KpiRecord, ProgressStatus, KpiViewId } from './kpi'
+import type { KpiRecord, ProgressStatus } from './kpi'
 import type { AppViewId } from './views'
 
 export interface ProfileRow {
@@ -28,6 +28,7 @@ export type Database = {
           view_id: KpiRecord['view_id']
           status: ProgressStatus
           updated_at: string
+        }
         Insert: {
           id?: string
           owner_id: string
