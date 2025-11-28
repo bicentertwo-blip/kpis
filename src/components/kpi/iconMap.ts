@@ -1,0 +1,32 @@
+import {
+  LineChart,
+  GaugeCircle,
+  RefreshCcw,
+  Send,
+  PiggyBank,
+  Users2,
+  Layers,
+  Sparkles,
+  FlaskRound,
+  Smile,
+  ShieldCheck,
+  Radar,
+  Gem,
+  type LucideIcon,
+} from 'lucide-react'
+
+export const KPI_ICON_MAP: Record<string, LucideIcon> = {
+  LineChart,
+  GaugeCircle,
+  RefreshCcw,
+  Send,
+  PiggyBank,
+  Users2,
+  Layers,
+  Sparkles,
+  FlaskRound,
+  Smile,
+  ShieldCheck,
+  Radar,
+  Gem,
+}
