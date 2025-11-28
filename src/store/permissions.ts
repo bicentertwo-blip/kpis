@@ -14,6 +14,8 @@ interface PermissionsStoreState {
   fetchForUser: (userId: string) => Promise<void>
   fetchAssignments: () => Promise<void>
   toggleView: (userId: string, viewId: AppViewId, enabled: boolean) => Promise<void>
+  setAllViewsForUser: (userId: string, views: AppViewId[]) => Promise<void>
+  setAllViewsForAllUsers: (views: AppViewId[]) => Promise<void>
   canAccess: (viewId: AppViewId) => boolean
 }
 
@@ -102,6 +104,64 @@ export const usePermissionsStore = create<PermissionsStoreState>((set, get) => (
       assignments: state.assignments.map((assignment) =>
         assignment.user_id === userId ? { ...assignment, permitted_views: next } : assignment
       ),
+    }))
+  },
+  setAllViewsForUser: async (userId, views) => {
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ permitted_views: views })
+      .eq('user_id', userId)
+
+    if (updateError) throw updateError
+
+    const { data: sessionData } = await supabase.auth.getSession()
+    const currentUserId = sessionData.session?.user.id
+
+    // Actualizar permisos del usuario actual si es el mismo
+    if (userId === currentUserId) {
+      const nextState = buildEmptyPermissions()
+      views.forEach((viewId) => {
+        nextState[viewId] = true
+      })
+      set({ permissions: nextState })
+    }
+
+    // Actualizar la lista de assignments
+    set((state) => ({
+      assignments: state.assignments.map((assignment) =>
+        assignment.user_id === userId ? { ...assignment, permitted_views: views } : assignment
+      ),
+    }))
+  },
+  setAllViewsForAllUsers: async (views) => {
+    const { assignments } = get()
+    
+    // Actualizar todos los usuarios en la base de datos
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ permitted_views: views })
+      .in('user_id', assignments.map(a => a.user_id))
+
+    if (updateError) throw updateError
+
+    const { data: sessionData } = await supabase.auth.getSession()
+    const currentUserId = sessionData.session?.user.id
+
+    // Actualizar permisos del usuario actual
+    if (currentUserId && assignments.some(a => a.user_id === currentUserId)) {
+      const nextState = buildEmptyPermissions()
+      views.forEach((viewId) => {
+        nextState[viewId] = true
+      })
+      set({ permissions: nextState })
+    }
+
+    // Actualizar todos los assignments
+    set((state) => ({
+      assignments: state.assignments.map((assignment) => ({
+        ...assignment,
+        permitted_views: views,
+      })),
     }))
   },
 }))
