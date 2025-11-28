@@ -60,6 +60,15 @@ export const usePermissionsStore = create<PermissionsStoreState>((set, get) => (
   },
   fetchAssignments: async () => {
     set({ adminLoading: true })
+    
+    // Primero sincronizar usuarios de auth con profiles
+    try {
+      await supabase.rpc('sync_all_users_to_profiles')
+    } catch (e) {
+      // Si la función no existe, continuar sin error
+      console.warn('sync_all_users_to_profiles not available:', e)
+    }
+    
     const { data, error } = await supabase
       .from('profiles')
       .select('user_id, email, permitted_views, updated_at')
