@@ -1,5 +1,6 @@
-import { KpiViewTemplate } from '@/components/kpi/KpiViewTemplate'
+import { KpiPageTemplate } from '@/components/kpi/KpiPageTemplate'
+import { ROE_ROA_CONFIG } from '@/config/kpi-configs'
 
-const RentabilidadOperativaPage = () => <KpiViewTemplate viewId="rentabilidad-operativa" />
+const RentabilidadOperativaPage = () => <KpiPageTemplate config={ROE_ROA_CONFIG} />
 
 export default RentabilidadOperativaPage

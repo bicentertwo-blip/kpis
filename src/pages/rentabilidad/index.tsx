@@ -1,5 +1,6 @@
-import { KpiViewTemplate } from '@/components/kpi/KpiViewTemplate'
+import { KpiPageTemplate } from '@/components/kpi/KpiPageTemplate'
+import { RENTABILIDAD_CONFIG } from '@/config/kpi-configs'
 
-const RentabilidadPage = () => <KpiViewTemplate viewId="rentabilidad" />
+const RentabilidadPage = () => <KpiPageTemplate config={RENTABILIDAD_CONFIG} />
 
 export default RentabilidadPage

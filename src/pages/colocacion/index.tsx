@@ -1,5 +1,6 @@
-import { KpiViewTemplate } from '@/components/kpi/KpiViewTemplate'
+import { KpiPageTemplate } from '@/components/kpi/KpiPageTemplate'
+import { COLOCACION_CONFIG } from '@/config/kpi-configs'
 
-const ColocacionPage = () => <KpiViewTemplate viewId="colocacion" />
+const ColocacionPage = () => <KpiPageTemplate config={COLOCACION_CONFIG} />
 
 export default ColocacionPage

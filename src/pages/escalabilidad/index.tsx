@@ -1,5 +1,6 @@
-import { KpiViewTemplate } from '@/components/kpi/KpiViewTemplate'
+import { KpiPageTemplate } from '@/components/kpi/KpiPageTemplate'
+import { ESCALABILIDAD_CONFIG } from '@/config/kpi-configs'
 
-const EscalabilidadPage = () => <KpiViewTemplate viewId="escalabilidad" />
+const EscalabilidadPage = () => <KpiPageTemplate config={ESCALABILIDAD_CONFIG} />
 
 export default EscalabilidadPage

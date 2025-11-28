@@ -1,5 +1,6 @@
-import { KpiViewTemplate } from '@/components/kpi/KpiViewTemplate'
+import { KpiPageTemplate } from '@/components/kpi/KpiPageTemplate'
+import { MARGEN_FINANCIERO_CONFIG } from '@/config/kpi-configs'
 
-const MargenFinancieroPage = () => <KpiViewTemplate viewId="margen-financiero" />
+const MargenFinancieroPage = () => <KpiPageTemplate config={MARGEN_FINANCIERO_CONFIG} />
 
 export default MargenFinancieroPage

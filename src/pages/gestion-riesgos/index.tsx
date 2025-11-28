@@ -1,5 +1,6 @@
-import { KpiViewTemplate } from '@/components/kpi/KpiViewTemplate'
+import { KpiPageTemplate } from '@/components/kpi/KpiPageTemplate'
+import { GESTION_RIESGOS_CONFIG } from '@/config/kpi-configs'
 
-const GestionRiesgosPage = () => <KpiViewTemplate viewId="gestion-riesgos" />
+const GestionRiesgosPage = () => <KpiPageTemplate config={GESTION_RIESGOS_CONFIG} />
 
 export default GestionRiesgosPage

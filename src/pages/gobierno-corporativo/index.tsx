@@ -1,5 +1,6 @@
-import { KpiViewTemplate } from '@/components/kpi/KpiViewTemplate'
+import { KpiPageTemplate } from '@/components/kpi/KpiPageTemplate'
+import { GOBIERNO_CORPORATIVO_CONFIG } from '@/config/kpi-configs'
 
-const GobiernoCorporativoPage = () => <KpiViewTemplate viewId="gobierno-corporativo" />
+const GobiernoCorporativoPage = () => <KpiPageTemplate config={GOBIERNO_CORPORATIVO_CONFIG} />
 
 export default GobiernoCorporativoPage

@@ -1,5 +1,6 @@
-import { KpiViewTemplate } from '@/components/kpi/KpiViewTemplate'
+import { KpiPageTemplate } from '@/components/kpi/KpiPageTemplate'
+import { INDICE_RENOVACION_CONFIG } from '@/config/kpi-configs'
 
-const IndiceRenovacionCreditosPage = () => <KpiViewTemplate viewId="indice-renovacion-creditos" />
+const IndiceRenovacionCreditosPage = () => <KpiPageTemplate config={INDICE_RENOVACION_CONFIG} />
 
 export default IndiceRenovacionCreditosPage

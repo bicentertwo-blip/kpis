@@ -1,5 +1,6 @@
-import { KpiViewTemplate } from '@/components/kpi/KpiViewTemplate'
+import { KpiPageTemplate } from '@/components/kpi/KpiPageTemplate'
+import { CUMPLIMIENTO_CONFIG } from '@/config/kpi-configs'
 
-const CumplimientoRegulatorioPage = () => <KpiViewTemplate viewId="cumplimiento-regulatorio" />
+const CumplimientoRegulatorioPage = () => <KpiPageTemplate config={CUMPLIMIENTO_CONFIG} />
 
 export default CumplimientoRegulatorioPage

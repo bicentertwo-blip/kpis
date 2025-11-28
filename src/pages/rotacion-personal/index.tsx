@@ -1,5 +1,6 @@
-import { KpiViewTemplate } from '@/components/kpi/KpiViewTemplate'
+import { KpiPageTemplate } from '@/components/kpi/KpiPageTemplate'
+import { ROTACION_PERSONAL_CONFIG } from '@/config/kpi-configs'
 
-const RotacionPersonalPage = () => <KpiViewTemplate viewId="rotacion-personal" />
+const RotacionPersonalPage = () => <KpiPageTemplate config={ROTACION_PERSONAL_CONFIG} />
 
 export default RotacionPersonalPage
