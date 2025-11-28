@@ -1,46 +1,64 @@
 import { useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/base/Button'
 import { useAuthStore } from '@/store/auth'
 import { supabase } from '@/lib/supabase'
 
 export const SetPasswordPage = () => {
+  const session = useAuthStore((state) => state.session)
   const updatePassword = useAuthStore((state) => state.updatePassword)
+  const location = useLocation()
+  const navigate = useNavigate()
   const [passwords, setPasswords] = useState({ password: '', confirm: '' })
   const [message, setMessage] = useState<string | null>(null)
-  const [isSessionReady, setIsSessionReady] = useState(false)
+  const [status, setStatus] = useState<'checking' | 'ready' | 'error'>('checking')
 
   useEffect(() => {
-    const hash = window.location.hash.replace('#', '')
-    const params = new URLSearchParams(hash)
-    const access_token = params.get('access_token')
-    const refresh_token = params.get('refresh_token')
-    const token_hash = params.get('token_hash')
-    const email = params.get('email') ?? undefined
-    const defaultType = window.location.pathname.includes('reset-password') ? 'recovery' : 'invite'
-    const rawType = params.get('type') || undefined
-    const typeParam = (rawType as 'signup' | 'magiclink' | 'invite' | 'recovery' | 'email_change' | undefined) ?? defaultType
+    if (session) {
+      setStatus('ready')
+      setMessage(null)
+      return
+    }
+
+    const hashParams = new URLSearchParams(location.hash.replace('#', ''))
+    const searchParams = new URLSearchParams(location.search)
+
+    const access_token = hashParams.get('access_token')
+    const refresh_token = hashParams.get('refresh_token')
+    const token_hash =
+      searchParams.get('token_hash') ??
+      hashParams.get('token_hash') ??
+      searchParams.get('token') ??
+      hashParams.get('token') ??
+      undefined
+    const email = searchParams.get('email') ?? hashParams.get('email') ?? undefined
+    const rawType = searchParams.get('type') ?? hashParams.get('type') ?? undefined
+    const normalizedType = rawType === 'invite' ? 'signup' : rawType ?? 'recovery'
+
+    if (!access_token && !token_hash) {
+      setStatus('error')
+      setMessage('El enlace no es válido o ya expiró. Solicita uno nuevo.')
+      return
+    }
 
     const bootstrap = async () => {
       try {
-        if (token_hash && typeParam) {
-          // For custom email templates using token_hash (recommended)
-          await supabase.auth.verifyOtp({ type: typeParam, token_hash, email })
-        } else if (access_token && refresh_token) {
-          // For default confirmation URLs that include access/refresh tokens
+        if (access_token && refresh_token) {
           await supabase.auth.setSession({ access_token, refresh_token })
-        } else {
-          setMessage('El enlace no es válido o ya expiró. Solicita uno nuevo.')
+        } else if (token_hash && normalizedType) {
+          await supabase.auth.verifyOtp({ type: normalizedType as any, token_hash, email })
         }
+        setStatus('ready')
+        setMessage(null)
       } catch (error) {
         console.error(error)
+        setStatus('error')
         setMessage('No se pudo validar el enlace. Solicita uno nuevo.')
-      } finally {
-        setIsSessionReady(true)
       }
     }
 
-    bootstrap()
-  }, [])
+    void bootstrap()
+  }, [location.hash, location.search, session])
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -50,7 +68,13 @@ export const SetPasswordPage = () => {
     }
     try {
       await updatePassword(passwords.password)
-      setMessage('Contraseña actualizada. Puedes cerrar esta ventana y regresar al panel.')
+      setMessage('Contraseña actualizada. Preparando tu cuenta...')
+      // Re-initialize to ensure profile is created after password is set
+      await useAuthStore.getState().initialize()
+      setMessage('¡Listo! Redirigiendo...')
+      setTimeout(() => {
+        navigate('/', { replace: true })
+      }, 500)
     } catch (error) {
       setMessage((error as Error).message)
     }
@@ -65,7 +89,7 @@ export const SetPasswordPage = () => {
           className="w-full rounded-2xl border border-white/60 bg-white/80 px-4 py-3 text-vision-ink outline-none focus:border-plasma-blue/40"
           value={passwords.password}
           onChange={(event) => setPasswords((prev) => ({ ...prev, password: event.target.value }))}
-          disabled={!isSessionReady}
+          disabled={status !== 'ready'}
         />
       </label>
       <label className="block space-y-2 text-sm">
@@ -75,11 +99,11 @@ export const SetPasswordPage = () => {
           className="w-full rounded-2xl border border-white/60 bg-white/80 px-4 py-3 text-vision-ink outline-none focus:border-plasma-blue/40"
           value={passwords.confirm}
           onChange={(event) => setPasswords((prev) => ({ ...prev, confirm: event.target.value }))}
-          disabled={!isSessionReady}
+          disabled={status !== 'ready'}
         />
       </label>
       {message && <p className="text-xs text-soft-slate">{message}</p>}
-      <Button type="submit" className="w-full" disabled={!isSessionReady}>
+      <Button type="submit" className="w-full" disabled={status !== 'ready'}>
         Guardar contraseña
       </Button>
     </form>

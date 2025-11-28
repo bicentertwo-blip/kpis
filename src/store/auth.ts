@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/types/auth'
-import { KPI_IDS } from '@/utils/constants'
+import { FIRST_USER_DEFAULT_VIEWS } from '@/utils/constants'
 
 type ProfileInsert = Omit<Profile, 'id'> & { id?: string }
 
@@ -20,38 +20,61 @@ interface AuthStoreState {
   setProfile: (profile: Profile | null) => void
 }
 
+let profileCache: Record<string, Profile> = {}
+let profileLocks: Record<string, Promise<Profile>> = {}
+
 const ensureProfile = async (user: User): Promise<Profile> => {
-  const { data: existing, error: fetchError } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('user_id', user.id)
-    .maybeSingle()
-
-  if (fetchError && fetchError.code !== 'PGRST116') {
-    throw fetchError
+  // Check cache first
+  if (profileCache[user.id]) {
+    return profileCache[user.id]
   }
 
-  if (existing) {
-    return existing as Profile
+  // Check if there's already a pending operation for this user
+  if (profileLocks[user.id]) {
+    return profileLocks[user.id]
   }
 
-  const { count } = await supabase.from('profiles').select('id', { head: true, count: 'exact' })
-  const isFirstUser = (count ?? 0) === 0
+  // Create a lock for this user
+  const lockPromise = (async () => {
+    try {
+      const { data: existing, error: fetchError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle()
 
-  const payload: ProfileInsert = {
-    id: crypto.randomUUID(),
-    user_id: user.id,
-    email: user.email ?? '',
-    role: isFirstUser ? 'superadmin' : 'user',
-    permitted_views: isFirstUser ? KPI_IDS : [],
-  }
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        throw fetchError
+      }
 
-  const { data, error } = await supabase.from('profiles').insert(payload).select().single()
-  if (error) {
-    throw error
-  }
-  return data as Profile
+      if (existing) {
+        profileCache[user.id] = existing as Profile
+        return existing as Profile
+      }
+
+      // Use RPC function to create profile with atomic first-user check
+      const { data, error } = await supabase.rpc('create_profile_with_permissions', {
+        p_user_id: user.id,
+        p_email: user.email ?? '',
+      })
+
+      if (error) {
+        throw error
+      }
+
+      const profile = data as Profile
+      profileCache[user.id] = profile
+      return profile
+    } finally {
+      delete profileLocks[user.id]
+    }
+  })()
+
+  profileLocks[user.id] = lockPromise
+  return lockPromise
 }
+
+let authSubscription: { unsubscribe: () => void } | null = null
 
 export const useAuthStore = create<AuthStoreState>()(
   persist(
@@ -73,7 +96,13 @@ export const useAuthStore = create<AuthStoreState>()(
             set({ profile })
           }
 
-          supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+          // Unsubscribe from previous listener if exists
+          if (authSubscription) {
+            authSubscription.unsubscribe()
+          }
+
+          // Register auth state change listener only once
+          const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
             set({ session: nextSession })
             if (nextSession?.user) {
               const profile = await ensureProfile(nextSession.user)
@@ -82,6 +111,8 @@ export const useAuthStore = create<AuthStoreState>()(
               set({ profile: null })
             }
           })
+          
+          authSubscription = subscription
         } catch (error) {
           console.error(error)
           set({ status: 'error', error: (error as Error).message })
@@ -99,11 +130,20 @@ export const useAuthStore = create<AuthStoreState>()(
       },
       logout: async () => {
         await supabase.auth.signOut()
+        profileCache = {}
+        profileLocks = {}
+        if (authSubscription) {
+          authSubscription.unsubscribe()
+          authSubscription = null
+        }
         set({ session: null, profile: null })
       },
       requestPasswordReset: async (email) => {
+        const redirectUrl = new URL('/auth/callback', window.location.origin)
+        redirectUrl.searchParams.set('next', '/set-password')
+
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/set-password`,
+          redirectTo: redirectUrl.toString(),
         })
         if (error) throw error
       },

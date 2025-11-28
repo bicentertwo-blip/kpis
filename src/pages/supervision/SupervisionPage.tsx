@@ -4,17 +4,12 @@ import { KPI_VIEWS } from '@/utils/constants'
 import type { UserProgressOverview } from '@/types/progress'
 import { GlassCard } from '@/components/base/GlassCard'
 import { ProgressPill } from '@/components/status/ProgressPill'
-import { useAuthStore } from '@/store/auth'
-import { WelcomeEmptyState } from '@/components/status/WelcomeEmptyState'
 
 export const SupervisionPage = () => {
   const [rows, setRows] = useState<UserProgressOverview[]>([])
   const [loading, setLoading] = useState(true)
-  const profile = useAuthStore((state) => state.profile)
 
   useEffect(() => {
-    if (profile?.role === 'user') return
-
     const load = async () => {
       setLoading(true)
       const [{ data: profiles }, { data: progress }] = await Promise.all([
@@ -40,11 +35,7 @@ export const SupervisionPage = () => {
       setLoading(false)
     }
     void load()
-  }, [profile?.role])
-
-  if (profile?.role === 'user') {
-    return <WelcomeEmptyState />
-  }
+  }, [])
 
   if (loading) {
     return <p className="text-sm text-soft-slate">Actualizando tablero de supervisión...</p>

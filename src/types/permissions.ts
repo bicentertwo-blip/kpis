@@ -1,16 +1,15 @@
-import type { KpiViewId } from './kpi'
-import type { UserRole } from './auth'
+import type { AppViewId } from './views'
 
 export interface PermissionAssignment {
   user_id: string
   email: string
-  role: UserRole
-  permitted_views: KpiViewId[]
+  permitted_views: AppViewId[]
   updated_at?: string
 }
 
-export interface PermissionTogglePayload {
-  user_id: string
-  view_id: KpiViewId
-  enabled: boolean
+export interface PermissionViewDefinition {
+  id: AppViewId
+  name: string
+  description: string
+  category: 'core' | 'kpi'
 }

@@ -1,28 +1,27 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
 import type { PermissionAssignment } from '@/types/permissions'
-import type { KpiViewId } from '@/types/kpi'
-import type { UserRole, Profile } from '@/types/auth'
-import { KPI_IDS } from '@/utils/constants'
+import type { Profile } from '@/types/auth'
+import type { AppViewId } from '@/types/views'
+import { ALL_VIEW_IDS } from '@/utils/constants'
 
 interface PermissionsStoreState {
-  permissions: Record<KpiViewId, boolean>
+  permissions: Record<AppViewId, boolean>
   assignments: PermissionAssignment[]
   loading: boolean
   adminLoading: boolean
   error: string | null
   fetchForUser: (userId: string) => Promise<void>
   fetchAssignments: () => Promise<void>
-  toggleView: (userId: string, viewId: KpiViewId, enabled: boolean) => Promise<void>
-  updateRole: (userId: string, role: UserRole) => Promise<void>
-  canAccess: (viewId: KpiViewId) => boolean
+  toggleView: (userId: string, viewId: AppViewId, enabled: boolean) => Promise<void>
+  canAccess: (viewId: AppViewId) => boolean
 }
 
 const buildEmptyPermissions = () =>
-  KPI_IDS.reduce<Record<KpiViewId, boolean>>((acc, id) => {
+  ALL_VIEW_IDS.reduce<Record<AppViewId, boolean>>((acc, id) => {
     acc[id] = false
     return acc
-  }, {} as Record<KpiViewId, boolean>)
+  }, {} as Record<AppViewId, boolean>)
 
 export const usePermissionsStore = create<PermissionsStoreState>((set, get) => ({
   permissions: buildEmptyPermissions(),
@@ -32,7 +31,11 @@ export const usePermissionsStore = create<PermissionsStoreState>((set, get) => (
   error: null,
   canAccess: (viewId) => get().permissions[viewId] ?? false,
   fetchForUser: async (userId) => {
-    if (!userId) return
+    if (!userId) {
+      set({ permissions: buildEmptyPermissions(), loading: false })
+      return
+    }
+
     set({ loading: true })
     const { data, error } = await supabase
       .from('profiles')
@@ -57,7 +60,7 @@ export const usePermissionsStore = create<PermissionsStoreState>((set, get) => (
     set({ adminLoading: true })
     const { data, error } = await supabase
       .from('profiles')
-      .select('user_id, email, role, permitted_views, updated_at')
+      .select('user_id, email, permitted_views, updated_at')
       .order('email')
 
     if (error) {
@@ -76,7 +79,7 @@ export const usePermissionsStore = create<PermissionsStoreState>((set, get) => (
 
     if (error) throw error
 
-    const current = ((data as Profile | null)?.permitted_views ?? []) as KpiViewId[]
+    const current = ((data as Profile | null)?.permitted_views ?? []) as AppViewId[]
     const next = enabled ? Array.from(new Set([...current, viewId])) : current.filter((item) => item !== viewId)
 
     const { error: updateError } = await supabase
@@ -98,16 +101,6 @@ export const usePermissionsStore = create<PermissionsStoreState>((set, get) => (
     set((state) => ({
       assignments: state.assignments.map((assignment) =>
         assignment.user_id === userId ? { ...assignment, permitted_views: next } : assignment
-      ),
-    }))
-  },
-  updateRole: async (userId, role) => {
-    const { error } = await supabase.from('profiles').update({ role }).eq('user_id', userId)
-    if (error) throw error
-
-    set((state) => ({
-      assignments: state.assignments.map((assignment) =>
-        assignment.user_id === userId ? { ...assignment, role } : assignment
       ),
     }))
   },

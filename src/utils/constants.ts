@@ -1,4 +1,6 @@
 import type { KpiViewDefinition, KpiViewId } from '@/types/kpi'
+import type { AppViewId } from '@/types/views'
+import type { PermissionViewDefinition } from '@/types/permissions'
 
 export const KPI_VIEWS: KpiViewDefinition[] = [
   {
@@ -196,5 +198,44 @@ export const KPI_VIEW_MAP = KPI_VIEWS.reduce<Record<KpiViewId, KpiViewDefinition
 }, {} as Record<KpiViewId, KpiViewDefinition>)
 
 export const KPI_IDS: KpiViewId[] = KPI_VIEWS.map((view) => view.id as KpiViewId)
+
+export const CORE_PERMISSION_VIEWS: PermissionViewDefinition[] = [
+  {
+    id: 'dashboard',
+    name: 'Dashboard',
+    description: 'Resumen ejecutivo con widgets clave.',
+    category: 'core',
+  },
+  {
+    id: 'configuracion',
+    name: 'Configuración',
+    description: 'Asigna permisos por usuario y administra vistas.',
+    category: 'core',
+  },
+  {
+    id: 'supervision',
+    name: 'Supervisión',
+    description: 'Monitorea el avance por usuario en cada KPI.',
+    category: 'core',
+  },
+]
+
+const KPI_PERMISSION_VIEWS: PermissionViewDefinition[] = KPI_VIEWS.map((view) => ({
+  id: view.id,
+  name: view.name,
+  description: view.description,
+  category: 'kpi',
+}))
+
+export const PERMISSION_VIEWS: PermissionViewDefinition[] = [...CORE_PERMISSION_VIEWS, ...KPI_PERMISSION_VIEWS]
+
+export const PERMISSION_VIEW_MAP = PERMISSION_VIEWS.reduce<Record<AppViewId, PermissionViewDefinition>>((acc, view) => {
+  acc[view.id as AppViewId] = view
+  return acc
+}, {} as Record<AppViewId, PermissionViewDefinition>)
+
+export const ALL_VIEW_IDS: AppViewId[] = PERMISSION_VIEWS.map((view) => view.id as AppViewId)
+
+export const FIRST_USER_DEFAULT_VIEWS: AppViewId[] = ['configuracion']
 
 export const AUTOSAVE_DEBOUNCE = 1200

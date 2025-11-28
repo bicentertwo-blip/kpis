@@ -1,11 +1,12 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { useEffect } from 'react'
 import { AuthLayout } from '@/layout/AuthLayout'
 import { AppShell } from '@/layout/AppShell'
-import { ProtectedRoute, PermissionGuard } from '@/layout/RouteGuards'
+import { ProtectedRoute, PermissionGuard, FirstAllowedRoute } from '@/layout/RouteGuards'
 import { LoginPage } from '@/pages/login/LoginPage'
 import { ResetPasswordPage } from '@/pages/reset-password/ResetPasswordPage'
 import { SetPasswordPage } from '@/pages/set-password/SetPasswordPage'
+import { AuthCallbackPage } from '@/pages/auth-callback/AuthCallbackPage'
 import { DashboardPage } from '@/pages/dashboard/DashboardPage'
 import { ConfiguracionPage } from '@/pages/configuracion/ConfiguracionPage'
 import { SupervisionPage } from '@/pages/supervision/SupervisionPage'
@@ -47,14 +48,15 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/set-password" element={<SetPasswordPage />} />
+          <Route path="/auth/callback" element={<AuthCallbackPage />} />
         </Route>
 
         <Route element={<ProtectedRoute />}>
           <Route element={<AppShell />}>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/configuracion" element={<ConfiguracionPage />} />
-            <Route path="/supervision" element={<SupervisionPage />} />
+            <Route path="/" element={<FirstAllowedRoute />} />
+            <Route path="/dashboard" element={<PermissionGuard viewId="dashboard"><DashboardPage /></PermissionGuard>} />
+            <Route path="/configuracion" element={<PermissionGuard viewId="configuracion"><ConfiguracionPage /></PermissionGuard>} />
+            <Route path="/supervision" element={<PermissionGuard viewId="supervision"><SupervisionPage /></PermissionGuard>} />
 
             <Route path="/margen-financiero" element={<PermissionGuard viewId="margen-financiero"><MargenFinancieroPage /></PermissionGuard>} />
             <Route path="/rentabilidad-operativa" element={<PermissionGuard viewId="rentabilidad-operativa"><RentabilidadOperativaPage /></PermissionGuard>} />
