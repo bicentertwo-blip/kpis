@@ -1,13 +1,13 @@
 /**
  * Formulario de resumen para KPIs
- * Componente reutilizable con validación, autosave y estilo VisionOS
+ * Componente reutilizable con validación y estilo VisionOS
+ * MODO MANUAL: Botón para guardar e insertar en la base de datos
  */
 
 import { motion } from 'framer-motion'
-import { Hash, DollarSign, Percent, Type, AlignLeft, ChevronDown, Check } from 'lucide-react'
+import { Hash, DollarSign, Percent, Type, AlignLeft, ChevronDown, Check, Save, RotateCcw, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
 import type { SectionDefinition, FieldDefinition } from '@/types/kpi-definitions'
 import { useKpiSummaryForm } from '@/hooks/useKpiSummaryForm'
-import { AutosaveIndicator } from '@/components/forms/AutosaveIndicator'
 import { cn } from '@/utils/ui'
 
 interface KpiSummaryFormProps {
@@ -47,13 +47,22 @@ export const KpiSummaryForm = ({ section, filters }: KpiSummaryFormProps) => {
     formValues,
     loading,
     saving,
-    lastSavedAt,
+    error,
+    saveSuccess,
     updateField,
     isFieldValid,
     getFormProgress,
+    saveAndClear,
+    resetForm,
+    canSave,
+    isDirty,
   } = useKpiSummaryForm(section, filters)
 
   const progress = getFormProgress()
+
+  const handleSave = async () => {
+    await saveAndClear()
+  }
 
   const renderField = (field: FieldDefinition) => {
     const config = fieldTypeConfig[field.type]
@@ -289,8 +298,78 @@ export const KpiSummaryForm = ({ section, filters }: KpiSummaryFormProps) => {
         {section.fields.map(renderField)}
       </motion.div>
 
-      {/* Indicador de guardado */}
-      <AutosaveIndicator saving={saving} lastSavedAt={lastSavedAt} />
+      {/* Botones de acción */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2"
+      >
+        {/* Mensaje de estado */}
+        {error && (
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700">
+            <AlertCircle className="size-4 shrink-0" />
+            <span className="text-sm">{error}</span>
+          </div>
+        )}
+        
+        {saveSuccess && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700"
+          >
+            <CheckCircle2 className="size-4 shrink-0" />
+            <span className="text-sm font-medium">¡Guardado exitosamente!</span>
+          </motion.div>
+        )}
+
+        <div className="flex-1" />
+
+        {/* Botón Limpiar */}
+        <button
+          type="button"
+          onClick={resetForm}
+          disabled={!isDirty || saving}
+          className={cn(
+            'flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl',
+            'border border-gray-200 bg-white/60 backdrop-blur-sm',
+            'text-sm font-medium text-gray-600',
+            'hover:bg-gray-50 hover:border-gray-300',
+            'disabled:opacity-40 disabled:cursor-not-allowed',
+            'transition-all duration-200'
+          )}
+        >
+          <RotateCcw className="size-4" />
+          <span>Limpiar</span>
+        </button>
+
+        {/* Botón Guardar */}
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={!canSave || saving}
+          className={cn(
+            'flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl',
+            'bg-gradient-to-r from-plasma-blue to-plasma-indigo',
+            'text-sm font-medium text-white',
+            'hover:shadow-glow hover:scale-[1.02]',
+            'disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-none',
+            'transition-all duration-200'
+          )}
+        >
+          {saving ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              <span>Guardando...</span>
+            </>
+          ) : (
+            <>
+              <Save className="size-4" />
+              <span>Guardar</span>
+            </>
+          )}
+        </button>
+      </motion.div>
     </div>
   )
 }

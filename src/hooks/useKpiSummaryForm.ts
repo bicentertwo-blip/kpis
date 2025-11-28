@@ -1,6 +1,7 @@
 /**
  * Hook para manejar formularios de resumen de KPIs
- * Incluye autosave, validación y persistencia en Supabase
+ * Incluye validación y persistencia en Supabase
+ * MODO MANUAL: El usuario debe hacer clic en "Guardar" para persistir
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -22,19 +23,20 @@ interface UseKpiSummaryFormState {
   lastSavedAt?: string
   error?: string | null
   isDirty: boolean
+  saveSuccess: boolean
 }
 
 interface UseKpiSummaryFormReturn extends UseKpiSummaryFormState {
   updateField: (fieldId: string, value: unknown) => void
   replaceForm: (values: Record<string, unknown>) => void
-  saveNow: () => Promise<void>
+  saveAndClear: () => Promise<boolean>
+  saveNow: () => Promise<boolean>
   resetForm: () => void
   getFieldValue: <T>(fieldId: string, defaultValue?: T) => T
   isFieldValid: (field: FieldDefinition) => boolean
   getFormProgress: () => { filled: number; total: number; percentage: number }
+  canSave: boolean
 }
-
-const AUTOSAVE_DEBOUNCE = 1500
 
 export const useKpiSummaryForm = (
   section: SectionDefinition,
@@ -49,10 +51,11 @@ export const useKpiSummaryForm = (
     saving: false,
     error: null,
     isDirty: false,
+    saveSuccess: false,
   })
 
-  const autosaveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const initialLoadRef = useRef(false)
+  const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Generar valores iniciales basados en los campos
   const getInitialValues = useCallback((): Record<string, unknown> => {
@@ -72,62 +75,22 @@ export const useKpiSummaryForm = (
     return values
   }, [section.fields, filters])
 
-  // Cargar registro existente
+  // Cargar datos iniciales (formulario inicia vacío para insertar)
   const fetchRecord = useCallback(async () => {
     if (!userId) return
 
     setState((prev) => ({ ...prev, loading: true, error: null }))
 
     try {
-      let query = supabase
-        .from(section.tableName)
-        .select('*')
-        .eq('owner_id', userId)
-
-      // Filtrar por año/mes si se proporcionan
-      if (filters?.anio) {
-        query = query.eq('anio', filters.anio)
-      }
-      if (filters?.mes) {
-        query = query.eq('mes', parseInt(filters.mes.toString()))
-      }
-
-      const { data, error } = await query.order('updated_at', { ascending: false }).limit(1).maybeSingle()
-
-      if (error && error.code !== 'PGRST116') {
-        setState((prev) => ({ ...prev, loading: false, error: error.message }))
-        return
-      }
-
-      const record = data as SummaryRecord | null
-      
-      if (record) {
-        // Mapear valores del registro a los campos del formulario
-        const formValues: Record<string, unknown> = {}
-        section.fields.forEach((field) => {
-          formValues[field.id] = record[field.id] ?? ''
-        })
-        
-        setState({
-          record,
-          formValues,
-          loading: false,
-          saving: false,
-          lastSavedAt: record.updated_at as string | undefined,
-          error: null,
-          isDirty: false,
-        })
-      } else {
-        // No hay registro, usar valores iniciales
-        setState({
-          record: null,
-          formValues: getInitialValues(),
-          loading: false,
-          saving: false,
-          error: null,
-          isDirty: false,
-        })
-      }
+      setState({
+        record: null,
+        formValues: getInitialValues(),
+        loading: false,
+        saving: false,
+        error: null,
+        isDirty: false,
+        saveSuccess: false,
+      })
       
       initialLoadRef.current = true
     } catch (err) {
@@ -135,26 +98,28 @@ export const useKpiSummaryForm = (
         ...prev,
         loading: false,
         error: (err as Error).message,
+        saveSuccess: false,
       }))
     }
-  }, [section.tableName, section.fields, userId, filters, getInitialValues])
+  }, [userId, getInitialValues])
 
   useEffect(() => {
     fetchRecord()
   }, [fetchRecord])
 
+  // Limpiar timeout al desmontar
   useEffect(() => {
     return () => {
-      if (autosaveRef.current) clearTimeout(autosaveRef.current)
+      if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current)
     }
   }, [])
 
-  // Persistir borrador
-  const persistDraft = useCallback(
-    async (nextValues: Record<string, unknown>) => {
-      if (!userId) return
+  // Persistir datos en la base de datos (INSERT nuevo registro)
+  const persistData = useCallback(
+    async (nextValues: Record<string, unknown>): Promise<boolean> => {
+      if (!userId) return false
 
-      setState((prev) => ({ ...prev, saving: true }))
+      setState((prev) => ({ ...prev, saving: true, error: null, saveSuccess: false }))
 
       try {
         const payload: Record<string, unknown> = {
@@ -170,82 +135,85 @@ export const useKpiSummaryForm = (
           if (field.type === 'number' || field.type === 'currency' || field.type === 'percentage') {
             payload[field.id] = value === '' || value === null || value === undefined 
               ? null 
-              : parseFloat(value.toString().replace(/[$%,]/g, ''))
+              : parseFloat(String(value).replace(/[$%,]/g, ''))
           } else if (field.type === 'select') {
-            payload[field.id] = value === '' ? null : value
+            payload[field.id] = value === '' ? null : parseInt(String(value))
           } else {
             payload[field.id] = value ?? null
           }
         })
 
-        // Si ya existe un registro, incluir el ID
-        if (state.record?.id) {
-          payload.id = state.record.id
-        }
-
-        const { data, error } = await supabase
+        // Siempre INSERT (nuevo registro)
+        const { error } = await supabase
           .from(section.tableName)
-          .upsert(payload, { 
-            onConflict: state.record?.id ? 'id' : 'owner_id,anio,mes',
-          })
-          .select()
-          .single()
+          .insert(payload)
 
         if (error) {
-          setState((prev) => ({ ...prev, saving: false, error: error.message }))
-          return
+          setState((prev) => ({ ...prev, saving: false, error: error.message, saveSuccess: false }))
+          return false
         }
 
         setState((prev) => ({
           ...prev,
-          record: data as SummaryRecord,
           saving: false,
           lastSavedAt: payload.updated_at as string,
           error: null,
           isDirty: false,
+          saveSuccess: true,
         }))
+
+        // Resetear el flag de éxito después de 3 segundos
+        if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current)
+        successTimeoutRef.current = setTimeout(() => {
+          setState((prev) => ({ ...prev, saveSuccess: false }))
+        }, 3000)
+
+        return true
       } catch (err) {
         setState((prev) => ({
           ...prev,
           saving: false,
           error: (err as Error).message,
+          saveSuccess: false,
         }))
+        return false
       }
     },
-    [state.record?.id, section.tableName, section.fields, userId]
+    [section.tableName, section.fields, userId]
   )
 
-  // Queue autosave
-  const queueAutosave = useCallback(
-    (draft: Record<string, unknown>) => {
-      if (autosaveRef.current) clearTimeout(autosaveRef.current)
-      autosaveRef.current = setTimeout(() => {
-        void persistDraft(draft)
-      }, AUTOSAVE_DEBOUNCE)
-    },
-    [persistDraft]
-  )
-
-  // Actualizar un campo
+  // Actualizar un campo (sin autosave)
   const updateField = useCallback((fieldId: string, value: unknown) => {
     setState((prev) => {
       const nextValues = { ...prev.formValues, [fieldId]: value }
-      queueAutosave(nextValues)
-      return { ...prev, formValues: nextValues, isDirty: true }
+      return { ...prev, formValues: nextValues, isDirty: true, saveSuccess: false }
     })
-  }, [queueAutosave])
+  }, [])
 
-  // Reemplazar todo el formulario
+  // Reemplazar todo el formulario (sin autosave)
   const replaceForm = useCallback((values: Record<string, unknown>) => {
-    setState((prev) => ({ ...prev, formValues: values, isDirty: true }))
-    queueAutosave(values)
-  }, [queueAutosave])
+    setState((prev) => ({ ...prev, formValues: values, isDirty: true, saveSuccess: false }))
+  }, [])
 
-  // Guardar inmediatamente
-  const saveNow = useCallback(async () => {
-    if (autosaveRef.current) clearTimeout(autosaveRef.current)
-    await persistDraft(state.formValues)
-  }, [persistDraft, state.formValues])
+  // Guardar y limpiar formulario
+  const saveAndClear = useCallback(async (): Promise<boolean> => {
+    const success = await persistData(state.formValues)
+    if (success) {
+      // Limpiar formulario manteniendo año y mes
+      setState((prev) => ({
+        ...prev,
+        formValues: getInitialValues(),
+        record: null,
+        isDirty: false,
+      }))
+    }
+    return success
+  }, [persistData, state.formValues, getInitialValues])
+
+  // Guardar sin limpiar
+  const saveNow = useCallback(async (): Promise<boolean> => {
+    return await persistData(state.formValues)
+  }, [persistData, state.formValues])
 
   // Resetear formulario
   const resetForm = useCallback(() => {
@@ -253,6 +221,8 @@ export const useKpiSummaryForm = (
       ...prev,
       formValues: getInitialValues(),
       isDirty: false,
+      saveSuccess: false,
+      error: null,
     }))
   }, [getInitialValues])
 
@@ -306,14 +276,25 @@ export const useKpiSummaryForm = (
     }
   }, [section.fields, state.formValues])
 
+  // Verificar si se puede guardar (todos los campos requeridos llenos)
+  const canSave = useMemo(() => {
+    const requiredFields = section.fields.filter((f) => f.required)
+    return requiredFields.every((field) => {
+      const value = state.formValues[field.id]
+      return value !== undefined && value !== null && value !== ''
+    })
+  }, [section.fields, state.formValues])
+
   return {
     ...state,
     updateField,
     replaceForm,
+    saveAndClear,
     saveNow,
     resetForm,
     getFieldValue,
     isFieldValid,
     getFormProgress,
+    canSave,
   }
 }
