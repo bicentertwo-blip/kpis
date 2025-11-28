@@ -1,15 +1,74 @@
 import { motion } from 'framer-motion'
+import { Sparkles } from 'lucide-react'
 
 export const FullScreenLoader = () => (
-  <div className="grid min-h-screen place-items-center bg-vision-gradient">
+  <div className="fixed inset-0 grid place-items-center bg-gradient-to-br from-white via-vision-glow to-white">
+    {/* Animated background orbs */}
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <motion.div
+        animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
+        transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+        className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-plasma-blue/10 blur-3xl"
+      />
+      <motion.div
+        animate={{ scale: [1.2, 1, 1.2], opacity: [0.3, 0.5, 0.3] }}
+        transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
+        className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full bg-plasma-indigo/10 blur-3xl"
+      />
+    </div>
+
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ repeat: Infinity, repeatType: 'reverse', duration: 1.2 }}
-      className="glass-panel rounded-4xl px-10 py-6 text-center"
+      className="relative flex flex-col items-center gap-6"
     >
-      <p className="text-sm uppercase tracking-[0.45em] text-soft-slate">Loading</p>
-      <p className="text-2xl font-semibold text-vision-ink">Preparando tu espacio</p>
+      {/* Logo with pulse */}
+      <motion.div
+        animate={{ scale: [1, 1.05, 1] }}
+        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+        className="relative"
+      >
+        <div className="flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-br from-plasma-blue via-plasma-indigo to-plasma-violet shadow-glow">
+          <Sparkles className="size-10 text-white" />
+        </div>
+        <motion.div
+          animate={{ scale: [1, 1.5, 1], opacity: [0.5, 0, 0.5] }}
+          transition={{ duration: 2, repeat: Infinity, ease: 'easeOut' }}
+          className="absolute inset-0 rounded-3xl bg-gradient-to-br from-plasma-blue to-plasma-violet"
+        />
+      </motion.div>
+
+      {/* Loading text */}
+      <div className="text-center">
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.2 }}
+          className="text-[10px] uppercase tracking-[0.4em] text-plasma-blue font-medium mb-2"
+        >
+          KPIs VisionOS
+        </motion.p>
+        <motion.h2
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="text-xl font-semibold text-vision-ink"
+        >
+          Preparando tu espacio
+        </motion.h2>
+      </div>
+
+      {/* Loading dots */}
+      <div className="flex items-center gap-2">
+        {[0, 1, 2].map((i) => (
+          <motion.span
+            key={i}
+            animate={{ scale: [1, 1.3, 1], opacity: [0.3, 1, 0.3] }}
+            transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
+            className="w-2 h-2 rounded-full bg-plasma-blue"
+          />
+        ))}
+      </div>
     </motion.div>
   </div>
 )
