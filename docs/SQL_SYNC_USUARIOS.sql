@@ -1,6 +1,65 @@
 -- =====================================================
 -- FUNCIÓN PARA SINCRONIZAR USUARIOS DE AUTH CON PROFILES
+-- Y POLÍTICAS RLS PARA ADMINISTRACIÓN DE PERMISOS
 -- Ejecutar en SQL Editor de Supabase
+-- =====================================================
+
+-- =====================================================
+-- PASO 1: ACTUALIZAR POLÍTICAS RLS DE PROFILES
+-- Para permitir que admins vean y editen todos los perfiles
+-- =====================================================
+
+-- Eliminar políticas existentes
+DROP POLICY IF EXISTS "Users can view own profile" ON profiles;
+DROP POLICY IF EXISTS "Users can view all profiles" ON profiles;
+DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
+DROP POLICY IF EXISTS "Admins can update all profiles" ON profiles;
+DROP POLICY IF EXISTS "profiles_select_own" ON profiles;
+DROP POLICY IF EXISTS "profiles_select_all" ON profiles;
+DROP POLICY IF EXISTS "profiles_update_own" ON profiles;
+DROP POLICY IF EXISTS "profiles_update_admin" ON profiles;
+
+-- Función para verificar si un usuario es admin (tiene acceso a Configuración)
+CREATE OR REPLACE FUNCTION is_admin()
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM profiles 
+    WHERE user_id = auth.uid() 
+    AND 'configuracion' = ANY(permitted_views)
+  );
+END;
+$$;
+
+-- Política SELECT: Admins pueden ver TODOS los perfiles, usuarios normales solo el suyo
+CREATE POLICY "profiles_select_policy" ON profiles
+FOR SELECT 
+TO authenticated
+USING (
+  auth.uid() = user_id  -- Siempre puede ver su propio perfil
+  OR is_admin()          -- Admins pueden ver todos
+);
+
+-- Política UPDATE: Usuarios pueden actualizar su propio perfil
+CREATE POLICY "profiles_update_own" ON profiles
+FOR UPDATE 
+TO authenticated
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+-- Política UPDATE: Admins pueden actualizar cualquier perfil
+CREATE POLICY "profiles_update_admin" ON profiles
+FOR UPDATE 
+TO authenticated
+USING (is_admin())
+WITH CHECK (is_admin());
+
+-- =====================================================
+-- PASO 2: FUNCIÓN DE SINCRONIZACIÓN
 -- =====================================================
 
 -- Esta función sincroniza todos los usuarios de auth.users
