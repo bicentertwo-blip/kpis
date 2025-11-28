@@ -134,7 +134,7 @@ export const KPI_VIEWS: KpiViewDefinition[] = [
     name: 'Satisfacción Cliente',
     description: 'CSAT, NPS y tiempos de respuesta.',
     table: 'kpi_satisfaccion_cliente',
-    icon: 'Smiley',
+    icon: 'Smile',
     accent: 'from-pink-50/80 via-white/60 to-red-100/60',
     fields: [
       { id: 'csat', label: 'CSAT', type: 'number', placeholder: '92' },
