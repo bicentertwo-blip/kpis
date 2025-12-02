@@ -386,7 +386,7 @@ export const KpiPageTemplate = ({ config }: KpiPageTemplateProps) => {
                 {hasDetails && (
                   <div className="flex items-center gap-3 p-2 rounded-lg bg-white/30">
                     <Upload className="size-4 text-soft-slate" />
-                    <span className="text-xs text-soft-slate flex-1">Detalles CSV</span>
+                    <span className="text-xs text-soft-slate flex-1">Detalles Excel</span>
                     <span className="text-xs font-medium text-vision-ink">
                       {config.details.length} layout{config.details.length > 1 ? 's' : ''}
                     </span>

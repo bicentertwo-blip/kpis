@@ -168,7 +168,7 @@ export const generateExcelTemplate = async (
   descRow.height = 22
   worksheet.mergeCells('A2', `${getColumnLetter(layout.columns.length)}2`)
   const descCell = worksheet.getCell('A2')
-  // Reemplazar 'CSV' por 'Excel' en la descripción
+  
   const cleanDescription = (layout.description || 'Plantilla de importación de datos').replace(/CSV/gi, 'Excel')
   descCell.value = cleanDescription
   descCell.font = { 

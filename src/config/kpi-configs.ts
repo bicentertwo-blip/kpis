@@ -1,6 +1,6 @@
 /**
  * Configuración centralizada de todos los KPIs
- * Define formularios de resumen y layouts CSV para importación
+ * Define formularios de resumen y layouts Excel para importación
  */
 
 import type { KpiDefinition, FieldDefinition } from '@/types/kpi-definitions'
@@ -106,7 +106,7 @@ export const MARGEN_FINANCIERO_CONFIG: KpiDefinition = {
     {
       id: 'detalle-operativo',
       title: 'Detalle por Entidad/Plaza/Producto',
-      description: 'Importar CSV con desagregación operativa del margen',
+      description: 'Importar Excel con desagregación operativa del margen',
       tableName: 'kpi_margen_financiero_detalle',
       columns: ['anio', 'mes', 'entidad', 'region', 'plaza', 'producto', 'concepto', 'valor', 'categoria', 'meta'],
     },
@@ -149,7 +149,7 @@ export const INDICE_RENOVACION_CONFIG: KpiDefinition = {
     {
       id: 'detalle-plaza',
       title: 'Detalle por Plaza',
-      description: 'Importar CSV con desagregación por plaza',
+      description: 'Importar Excel con desagregación por plaza',
       tableName: 'kpi_indice_renovacion_detalle',
       columns: ['anio', 'mes', 'plaza', 'total', 'renovaciones', 'nuevas', 'indice_renovacion', 'meta'],
     },
@@ -306,21 +306,21 @@ export const COLOCACION_CONFIG: KpiDefinition = {
     {
       id: 'detalle-colocacion',
       title: '1. Detalle Colocación',
-      description: 'CSV con monto colocado por plaza/producto',
+      description: 'Excel con monto colocado por plaza/producto',
       tableName: 'kpi_colocacion_detalle_1',
       columns: ['anio', 'mes', 'entidad', 'plaza', 'producto', 'monto_colocacion', 'meta'],
     },
     {
       id: 'detalle-imor',
       title: '2. Detalle IMOR',
-      description: 'CSV con morosidad por plaza/producto',
+      description: 'Excel con morosidad por plaza/producto',
       tableName: 'kpi_colocacion_detalle_2',
       columns: ['anio', 'mes', 'entidad', 'plaza', 'producto', 'cartera_total', 'cartera_vencida', 'imor', 'meta'],
     },
     {
       id: 'detalle-crecimiento',
       title: '3. Detalle Crecimiento',
-      description: 'CSV con crecimiento por plaza/producto',
+      description: 'Excel con crecimiento por plaza/producto',
       tableName: 'kpi_colocacion_detalle_3',
       columns: ['anio', 'mes', 'entidad', 'plaza', 'producto', 'cartera_inicial', 'cartera_final', 'crecimiento', 'meta'],
     },
@@ -416,28 +416,28 @@ export const RENTABILIDAD_CONFIG: KpiDefinition = {
     {
       id: 'detalle-ebitda',
       title: '1. Detalle EBITDA',
-      description: 'CSV con EBITDA por plaza',
+      description: 'Excel con EBITDA por plaza',
       tableName: 'kpi_rentabilidad_detalle_1',
       columns: ['anio', 'mes', 'entidad', 'plaza', 'ebitda', 'meta'],
     },
     {
       id: 'detalle-flujo-libre',
       title: '2. Detalle Flujo Libre',
-      description: 'CSV con flujo libre por plaza',
+      description: 'Excel con flujo libre por plaza',
       tableName: 'kpi_rentabilidad_detalle_2',
       columns: ['anio', 'mes', 'entidad', 'plaza', 'flujo_libre', 'meta'],
     },
     {
       id: 'detalle-flujo-operativo',
       title: '3. Detalle Flujo Operativo',
-      description: 'CSV con flujo operativo por plaza',
+      description: 'Excel con flujo operativo por plaza',
       tableName: 'kpi_rentabilidad_detalle_3',
       columns: ['anio', 'mes', 'entidad', 'plaza', 'flujo_operativo', 'meta'],
     },
     {
       id: 'detalle-gasto-credito',
       title: '4. Detalle Gasto por Crédito',
-      description: 'CSV con gastos por plaza/producto/concepto',
+      description: 'Excel con gastos por plaza/producto/concepto',
       tableName: 'kpi_rentabilidad_detalle_4',
       columns: ['anio', 'mes', 'entidad', 'plaza', 'producto', 'concepto', 'monto', 'meta'],
     },
@@ -534,28 +534,28 @@ export const ROTACION_PERSONAL_CONFIG: KpiDefinition = {
     {
       id: 'detalle-rotacion',
       title: '1. Detalle Rotación',
-      description: 'CSV con rotación por región/plaza/puesto',
+      description: 'Excel con rotación por región/plaza/puesto',
       tableName: 'kpi_rotacion_detalle_1',
       columns: ['anio', 'mes', 'region', 'plaza', 'puesto', 'hc', 'ingresos', 'bajas', 'indice_rotacion', 'meta'],
     },
     {
       id: 'detalle-dias-sin-cubrir',
       title: '2. Detalle Días sin Cubrir',
-      description: 'CSV con días por región/plaza',
+      description: 'Excel con días por región/plaza',
       tableName: 'kpi_rotacion_detalle_2',
       columns: ['anio', 'mes', 'region', 'plaza', 'dias_sin_cubrir', 'meta'],
     },
     {
       id: 'detalle-ausentismo',
       title: '3. Detalle Ausentismo',
-      description: 'CSV con ausentismo por región/plaza',
+      description: 'Excel con ausentismo por región/plaza',
       tableName: 'kpi_rotacion_detalle_3',
       columns: ['anio', 'mes', 'region', 'plaza', 'ausentismo', 'meta'],
     },
     {
       id: 'detalle-permanencia',
       title: '4. Detalle Permanencia',
-      description: 'CSV con permanencia por región/plaza',
+      description: 'Excel con permanencia por región/plaza',
       tableName: 'kpi_rotacion_detalle_4',
       columns: ['anio', 'mes', 'region', 'plaza', 'permanencia_12m', 'meta'],
     },
@@ -633,21 +633,21 @@ export const ESCALABILIDAD_CONFIG: KpiDefinition = {
     {
       id: 'detalle-procesos',
       title: '1. Detalle Procesos',
-      description: 'CSV con procesos por entidad/plaza',
+      description: 'Excel con procesos por entidad/plaza',
       tableName: 'kpi_escalabilidad_detalle_1',
       columns: ['anio', 'mes', 'entidad', 'plaza', 'procesos_digitalizados', 'meta'],
     },
     {
       id: 'detalle-transacciones',
       title: '2. Detalle Transacciones',
-      description: 'CSV con transacciones por entidad/plaza',
+      description: 'Excel con transacciones por entidad/plaza',
       tableName: 'kpi_escalabilidad_detalle_2',
       columns: ['anio', 'mes', 'entidad', 'plaza', 'transacciones_automaticas', 'meta'],
     },
     {
       id: 'detalle-cost-to-serve',
       title: '3. Detalle Cost to Serve',
-      description: 'CSV con costos por entidad/plaza',
+      description: 'Excel con costos por entidad/plaza',
       tableName: 'kpi_escalabilidad_detalle_3',
       columns: ['anio', 'mes', 'entidad', 'plaza', 'cost_to_serve', 'meta'],
     },
@@ -729,21 +729,21 @@ export const POSICIONAMIENTO_MARCA_CONFIG: KpiDefinition = {
     {
       id: 'detalle-recordacion',
       title: '1. Detalle Recordación',
-      description: 'CSV con recordación por región/plaza',
+      description: 'Excel con recordación por región/plaza',
       tableName: 'kpi_posicionamiento_detalle_1',
       columns: ['anio', 'mes', 'region', 'plaza', 'recordacion_marca', 'meta'],
     },
     {
       id: 'detalle-alcance',
       title: '2. Detalle Alcance',
-      description: 'CSV con alcance por región/plaza',
+      description: 'Excel con alcance por región/plaza',
       tableName: 'kpi_posicionamiento_detalle_2',
       columns: ['anio', 'mes', 'region', 'plaza', 'alcance_campanas', 'meta'],
     },
     {
       id: 'detalle-nps',
       title: '3. Detalle NPS',
-      description: 'CSV con NPS por región/plaza',
+      description: 'Excel con NPS por región/plaza',
       tableName: 'kpi_posicionamiento_detalle_3',
       columns: ['anio', 'mes', 'region', 'plaza', 'nps', 'meta'],
     },
@@ -804,7 +804,7 @@ export const INNOVACION_CONFIG: KpiDefinition = {
     {
       id: 'detalle-proyectos',
       title: 'Detalle de Proyectos',
-      description: 'CSV con detalle por proyecto',
+      description: 'Excel con detalle por proyecto',
       tableName: 'kpi_innovacion_detalle',
       columns: ['anio', 'mes', 'proyecto', 'etapa', 'indicador_implementacion', 'riesgo', 'estimacion_ahorro', 'responsable', 'meta'],
     },
@@ -884,21 +884,21 @@ export const SATISFACCION_CONFIG: KpiDefinition = {
     {
       id: 'detalle-nps',
       title: '1. Detalle NPS',
-      description: 'CSV con NPS por región/plaza/categoría',
+      description: 'Excel con NPS por región/plaza/categoría',
       tableName: 'kpi_satisfaccion_detalle_1',
       columns: ['anio', 'mes', 'region', 'plaza', 'categoria', 'nps', 'meta'],
     },
     {
       id: 'detalle-quejas',
       title: '2. Detalle Quejas',
-      description: 'CSV con quejas por región/plaza',
+      description: 'Excel con quejas por región/plaza',
       tableName: 'kpi_satisfaccion_detalle_2',
       columns: ['anio', 'mes', 'region', 'plaza', 'quejas_72h', 'meta'],
     },
     {
       id: 'detalle-clima',
       title: '3. Detalle Clima',
-      description: 'CSV con clima por región/plaza',
+      description: 'Excel con clima por región/plaza',
       tableName: 'kpi_satisfaccion_detalle_3',
       columns: ['anio', 'mes', 'region', 'plaza', 'clima_laboral', 'meta'],
     },
@@ -955,7 +955,7 @@ export const CUMPLIMIENTO_CONFIG: KpiDefinition = {
       ],
     },
   ],
-  details: [], // Sin detalle CSV especificado
+  details: [], // Sin detalle Excel especificado
 }
 
 // =====================================================
@@ -1013,7 +1013,7 @@ export const GESTION_RIESGOS_CONFIG: KpiDefinition = {
     {
       id: 'detalle-riesgos',
       title: 'Detalle de Riesgos',
-      description: 'CSV con detalle por tipo de riesgo',
+      description: 'Excel con detalle por tipo de riesgo',
       tableName: 'kpi_gestion_riesgos_detalle',
       columns: ['anio', 'mes', 'tipo', 'descripcion', 'incidentes_criticos', 'riesgos_nuevos', 'riesgos_mitigados', 'cumplimiento_planes', 'meta'],
     },
@@ -1074,7 +1074,7 @@ export const GOBIERNO_CORPORATIVO_CONFIG: KpiDefinition = {
     {
       id: 'detalle-comites',
       title: 'Detalle por Comité',
-      description: 'CSV con detalle por comité',
+      description: 'Excel con detalle por comité',
       tableName: 'kpi_gobierno_corporativo_detalle',
       columns: ['anio', 'mes', 'comite', 'sesiones', 'acuerdos_por_area', 'kpis_reportados', 'seguimiento_politicas', 'meta'],
     },

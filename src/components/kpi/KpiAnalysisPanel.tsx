@@ -80,7 +80,7 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
   const [detalleSections, setDetalleSections] = useState<SectionData[]>([])
   const [activeResumenIndex, setActiveResumenIndex] = useState(0)
   const [activeDetalleIndex, setActiveDetalleIndex] = useState(0)
-  const [selectedYear, setSelectedYear] = useState(filters?.anio || new Date().getFullYear())
+  const [selectedYear, setSelectedYear] = useState<number | 'all'>(filters?.anio || 'all')
   const [showYearFilter, setShowYearFilter] = useState(false)
   
   const userId = useAuthStore((state) => state.session?.user.id)
@@ -113,27 +113,38 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
       try {
         // Cargar datos de TODAS las tablas de resumen
         const resumenPromises = config.summaries.map(async (summary) => {
-          const { data: resumen } = await supabase
+          let query = supabase
             .from(summary.tableName)
             .select('*')
-            .eq('anio', selectedYear)
+          
+          // Filtrar por año solo si no es "all"
+          if (selectedYear !== 'all') {
+            query = query.eq('anio', selectedYear)
+          }
+          
+          const { data: resumen } = await query
+            .order('anio', { ascending: true })
             .order('mes', { ascending: true })
             .order('updated_at', { ascending: false })
 
           let processedData: DataPoint[] = []
 
           if (resumen && resumen.length > 0) {
-            // Filtrar para quedarnos solo con el más reciente por mes
-            const latestByMonth = (resumen as Record<string, unknown>[]).reduce((acc: Record<number, Record<string, unknown>>, curr) => {
-              const mes = curr.mes as number
-              if (!acc[mes] || new Date(curr.updated_at as string) > new Date(acc[mes].updated_at as string)) {
-                acc[mes] = curr
+            // Filtrar para quedarnos solo con el más reciente por año/mes
+            const latestByPeriod = (resumen as Record<string, unknown>[]).reduce((acc: Record<string, Record<string, unknown>>, curr) => {
+              const key = `${curr.anio}-${curr.mes}`
+              if (!acc[key] || new Date(curr.updated_at as string) > new Date(acc[key].updated_at as string)) {
+                acc[key] = curr
               }
               return acc
             }, {})
 
-            processedData = Object.values(latestByMonth)
-              .sort((a, b) => (a.mes as number) - (b.mes as number))
+            processedData = Object.values(latestByPeriod)
+              .sort((a, b) => {
+                const yearDiff = (a.anio as number) - (b.anio as number)
+                if (yearDiff !== 0) return yearDiff
+                return (a.mes as number) - (b.mes as number)
+              })
               .map((r) => ({
                 ...r,
                 periodo: `${MONTHS_SHORT[(r.mes as number) - 1]} ${r.anio}`,
@@ -151,10 +162,15 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
         // Cargar datos de TODAS las tablas de detalle
         const detallePromises = config.details.map(async (detail) => {
           // Primero obtener la fecha de la última carga
-          const { data: lastRecord } = await supabase
+          let lastRecordQuery = supabase
             .from(detail.tableName)
             .select('created_at')
-            .eq('anio', selectedYear)
+          
+          if (selectedYear !== 'all') {
+            lastRecordQuery = lastRecordQuery.eq('anio', selectedYear)
+          }
+          
+          const { data: lastRecord } = await lastRecordQuery
             .order('created_at', { ascending: false })
             .limit(1)
             .single()
@@ -167,12 +183,18 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
             const startTime = new Date(lastUploadDate.getTime() - 60000).toISOString()
             const endTime = new Date(lastUploadDate.getTime() + 60000).toISOString()
 
-            const { data: detalle } = await supabase
+            let detalleQuery = supabase
               .from(detail.tableName)
               .select('*')
-              .eq('anio', selectedYear)
+            
+            if (selectedYear !== 'all') {
+              detalleQuery = detalleQuery.eq('anio', selectedYear)
+            }
+            
+            const { data: detalle } = await detalleQuery
               .gte('created_at', startTime)
               .lte('created_at', endTime)
+              .order('anio', { ascending: true })
               .order('mes', { ascending: true })
 
             if (detalle && detalle.length > 0) {
@@ -187,26 +209,32 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
                 count: detalle.length
               }
 
-              // Agrupar por mes
-              const grouped = (detalle as Record<string, unknown>[]).reduce((acc: Record<number, DataPoint>, curr) => {
+              // Agrupar por año/mes
+              const grouped = (detalle as Record<string, unknown>[]).reduce((acc: Record<string, DataPoint>, curr) => {
+                const key = `${curr.anio}-${curr.mes}`
                 const mes = curr.mes as number
-                if (!acc[mes]) {
-                  acc[mes] = {
-                    periodo: `${MONTHS_SHORT[mes - 1]} ${curr.anio}`,
+                const anio = curr.anio as number
+                if (!acc[key]) {
+                  acc[key] = {
+                    periodo: `${MONTHS_SHORT[mes - 1]} ${anio}`,
                     mes,
-                    anio: curr.anio as number,
+                    anio,
                     count: 0,
                   }
                 }
-                acc[mes].count = (acc[mes].count as number) + 1
-                Object.keys(curr).forEach((key) => {
-                  if (typeof curr[key] === 'number' && !['mes', 'anio'].includes(key)) {
-                    acc[mes][key] = ((acc[mes][key] as number) || 0) + (curr[key] as number)
+                acc[key].count = (acc[key].count as number) + 1
+                Object.keys(curr).forEach((k) => {
+                  if (typeof curr[k] === 'number' && !['mes', 'anio'].includes(k)) {
+                    acc[key][k] = ((acc[key][k] as number) || 0) + (curr[k] as number)
                   }
                 })
                 return acc
               }, {})
-              processedData = Object.values(grouped)
+              processedData = Object.values(grouped).sort((a, b) => {
+                const yearDiff = a.anio - b.anio
+                if (yearDiff !== 0) return yearDiff
+                return a.mes - b.mes
+              })
             }
           }
 
@@ -334,7 +362,7 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-plasma-blue/10 to-plasma-indigo/10 flex items-center justify-center mb-4">
             <BarChart3 className="size-8 text-plasma-blue/50" />
           </div>
-          <p className="text-soft-slate text-sm">Sin datos para {selectedYear}</p>
+          <p className="text-soft-slate text-sm">Sin datos {selectedYear === 'all' ? 'disponibles' : `para ${selectedYear}`}</p>
           <p className="text-soft-slate/60 text-xs mt-1">Captura información en Resumen o importa datos</p>
         </div>
       )
@@ -436,6 +464,13 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
     return Array.from({ length: 5 }, (_, i) => currentYear - i)
   }, [])
 
+  // Opciones de año incluyendo "Todos"
+  type YearOption = { value: number | 'all'; label: string }
+  const yearOptions: YearOption[] = useMemo(() => [
+    { value: 'all', label: 'Todos los años' },
+    ...years.map(y => ({ value: y, label: String(y) }))
+  ], [years])
+
   return (
     <div className="space-y-4">
       {/* Header con toggle Resumen/Detalle */}
@@ -489,7 +524,7 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
               className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/50 border border-white/60 text-sm font-medium text-vision-ink hover:bg-white/70 transition-all"
             >
               <Calendar className="size-4 text-plasma-blue" />
-              <span>{selectedYear}</span>
+              <span>{selectedYear === 'all' ? 'Todos' : selectedYear}</span>
               <ChevronDown className={cn('size-4 transition-transform', showYearFilter && 'rotate-180')} />
             </button>
             
@@ -499,23 +534,23 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="absolute top-full left-0 mt-2 z-20 glass-panel rounded-xl border border-white/60 shadow-xl overflow-hidden"
+                  className="absolute top-full left-0 mt-2 z-20 glass-panel rounded-xl border border-white/60 shadow-xl overflow-hidden min-w-[140px]"
                 >
-                  {years.map((year) => (
+                  {yearOptions.map((option) => (
                     <button
-                      key={year}
+                      key={option.value}
                       onClick={() => {
-                        setSelectedYear(year)
+                        setSelectedYear(option.value)
                         setShowYearFilter(false)
                       }}
                       className={cn(
                         'w-full px-4 py-2.5 text-sm text-left transition-all',
-                        year === selectedYear
+                        option.value === selectedYear
                           ? 'bg-plasma-blue/10 text-plasma-blue font-semibold'
                           : 'text-vision-ink hover:bg-white/50'
                       )}
                     >
-                      {year}
+                      {option.label}
                     </button>
                   ))}
                 </motion.div>
@@ -686,7 +721,7 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
                 <div className="w-8 h-8 rounded-xl bg-purple-100 flex items-center justify-center">
                   <Sparkles className="size-4 text-purple-600" />
                 </div>
-                <span className="text-xs text-soft-slate">Total {selectedYear}</span>
+                <span className="text-xs text-soft-slate">Total {selectedYear === 'all' ? 'acumulado' : selectedYear}</span>
               </div>
               <p className="text-lg sm:text-xl font-bold text-vision-ink truncate">
                 {formatCurrency(metrics.total)}
@@ -707,7 +742,7 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
               {currentSection?.title || (activeView === 'resumen' ? 'Tendencia de Resumen' : 'Tendencia de Detalle')}
             </h3>
             <p className="text-xs text-soft-slate mt-0.5">
-              Evolución mensual • {selectedYear}
+              Evolución {selectedYear === 'all' ? 'histórica' : `mensual • ${selectedYear}`}
             </p>
             {/* Info de última carga para detalles */}
             {activeView === 'detalle' && currentSection?.lastUploadInfo && (

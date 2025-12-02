@@ -1,6 +1,6 @@
 /**
  * Definiciones de tipos para la arquitectura de KPIs
- * Soporta formularios de resumen (manual) y carga masiva CSV (detalle)
+ * Soporta formularios de resumen (manual) y carga masiva Excel (detalle)
  */
 
 // =====================================================
@@ -54,7 +54,7 @@ export interface DetailLayoutDefinition {
   id: string
   title: string
   description?: string
-  columns: string[] // Columnas del CSV en snake_case
+  columns: string[] // Columnas del Excel en snake_case
   tableName: string // Nombre de tabla en Supabase para este detalle
 }
 
@@ -66,7 +66,7 @@ export interface KpiDefinition {
   icon: string
   accent: string
   summaries: SectionDefinition[] // Múltiples formularios de resumen
-  details: DetailLayoutDefinition[] // Múltiples layouts CSV de detalle
+  details: DetailLayoutDefinition[] // Múltiples layouts Excel de detalle
 }
 
 // =====================================================

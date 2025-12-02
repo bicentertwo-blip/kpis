@@ -53,7 +53,7 @@ export const KpiViewTemplate = ({ viewId }: KpiViewTemplateProps) => {
               <div>
                 <p className="text-sm font-semibold text-vision-ink">Estado de captura</p>
                 <p className="text-xs text-soft-slate mt-1 leading-relaxed">
-                  Se guarda automáticamente cada ajuste. Puedes importar un CSV o continuar manualmente.
+                  Se guarda automáticamente cada ajuste. Puedes importar un Excel o continuar manualmente.
                 </p>
               </div>
             </div>
