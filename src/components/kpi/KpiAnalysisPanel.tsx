@@ -72,8 +72,8 @@ const PIE_COLORS = ['#4F46E5', '#06B6D4', '#8B5CF6', '#F59E0B', '#10B981', '#EF4
 
 const MONTHS_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
-// Campos que deben mostrarse como porcentaje
-const PERCENTAGE_FIELDS = [
+// Campos que deben mostrarse como porcentaje (coincidencia exacta)
+const PERCENTAGE_FIELDS_EXACT = new Set([
   'roe', 'roa', 'meta_roe', 'meta_roa',
   'indice_renovacion',
   'imor', 'crecimiento',
@@ -83,19 +83,19 @@ const PERCENTAGE_FIELDS = [
   'quejas_72h', 'clima_laboral',
   'reportes_a_tiempo',
   'exposicion',
-  'acuerdos_cumplidos',
-  'meta' // La meta también puede ser porcentaje en algunos contextos
-]
+  'acuerdos_cumplidos'
+])
 
 // Función para detectar si un campo es porcentaje
 const isPercentageField = (fieldName: string): boolean => {
   const lowerField = fieldName.toLowerCase()
-  return PERCENTAGE_FIELDS.some(pf => lowerField.includes(pf)) ||
-    lowerField.includes('porcentaje') ||
-    lowerField.includes('indice') ||
-    lowerField.includes('tasa') ||
-    lowerField.endsWith('_pct') ||
-    lowerField.endsWith('_%')
+  // Coincidencia exacta primero
+  if (PERCENTAGE_FIELDS_EXACT.has(lowerField)) return true
+  // Patrones específicos que indican porcentaje
+  if (lowerField.endsWith('_pct')) return true
+  if (lowerField.endsWith('_%')) return true
+  // No usar "includes" genérico para evitar falsos positivos
+  return false
 }
 
 export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => {
