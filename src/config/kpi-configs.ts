@@ -229,9 +229,9 @@ export const ROE_ROA_CONFIG: KpiDefinition = {
     {
       id: 'detalle-entidad',
       title: 'Detalle por Entidad',
-      description: 'Importar CSV con datos por entidad',
+      description: 'Importar Excel con datos por entidad',
       tableName: 'kpi_roe_roa_detalle',
-      columns: ['anio', 'mes', 'entidad', 'capital_contable', 'utilidad_operativa_mensual', 'activo_total'],
+      columns: ['anio', 'mes', 'entidad', 'capital_contable', 'utilidad_operativa', 'utilidad_neta', 'activo_total'],
     },
   ],
 }

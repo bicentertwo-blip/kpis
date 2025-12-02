@@ -1,11 +1,11 @@
 /**
- * Hook para importar CSV con validación robusta
- * Soporta múltiples formatos y valida estructura de datos
+ * Hook para importar Excel (.xlsx) con validación robusta
+ * Soporta formato corporativo y valida estructura de datos
  */
 
 import { useCallback, useState } from 'react'
-import Papa from 'papaparse'
 import type { DetailLayoutDefinition, ImportValidationResult, ImportProgress } from '@/types/kpi-definitions'
+import { parseExcelFile } from '@/utils/excel'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 
@@ -29,25 +29,7 @@ export const useKpiImporter = (): UseKpiImporterReturn => {
   
   const userId = useAuthStore((state) => state.session?.user.id)
 
-  const parseFile = useCallback((file: File): Promise<{ data: ParsedRow[]; errors: string[] }> => {
-    return new Promise((resolve) => {
-      Papa.parse<Record<string, string>>(file, {
-        header: true,
-        dynamicTyping: false,
-        skipEmptyLines: 'greedy',
-        transformHeader: (header) => header.trim().toLowerCase().replace(/\s+/g, '_'),
-        complete: (result) => {
-          const errors = result.errors?.map((e) => `Fila ${e.row}: ${e.message}`) ?? []
-          resolve({ data: result.data ?? [], errors })
-        },
-        error: (error) => {
-          resolve({ data: [], errors: [error.message] })
-        },
-      })
-    })
-  }, [])
-
-  const normalizeValue = useCallback((value: string | undefined, column: string): string | number | null => {
+  const normalizeValue = useCallback((value: unknown, column: string): string | number | null => {
     if (value === undefined || value === null || value === '') {
       return null
     }
@@ -70,6 +52,11 @@ export const useKpiImporter = (): UseKpiImporterReturn => {
       'seguimiento_politicas', 'indicador_implementacion', 'estimacion_ahorro',
     ]
 
+    // Si ya es número, retornarlo directamente (Excel ya tipifica)
+    if (typeof value === 'number') {
+      return value
+    }
+
     if (numericColumns.includes(column)) {
       // Limpiar formato de moneda y porcentajes
       const cleaned = trimmed
@@ -84,14 +71,26 @@ export const useKpiImporter = (): UseKpiImporterReturn => {
   }, [])
 
   const validateFile = useCallback(async (file: File, layout: DetailLayoutDefinition): Promise<ImportValidationResult> => {
-    const { data, errors: parseErrors } = await parseFile(file)
+    const parseResult = await parseExcelFile(file)
     
     const result: ImportValidationResult = {
       valid: true,
-      errors: [...parseErrors],
+      errors: [],
       warnings: [],
-      rowCount: data.length,
+      rowCount: 0,
     }
+
+    if (parseResult.errors.length > 0 || parseResult.data.length === 0) {
+      result.valid = false
+      result.errors = parseResult.errors.length > 0 
+        ? parseResult.errors 
+        : ['Error al leer el archivo Excel']
+      setValidationResult(result)
+      return result
+    }
+
+    const data = parseResult.data as ParsedRow[]
+    result.rowCount = data.length
 
     if (data.length === 0) {
       result.valid = false
@@ -118,11 +117,11 @@ export const useKpiImporter = (): UseKpiImporterReturn => {
 
     // Validar datos de cada fila
     data.forEach((row, index) => {
-      const rowNum = index + 2 // +2 por header y 0-index
+      const rowNum = index + 1
 
       // Validar año
-      if (row.anio !== undefined) {
-        const anio = parseInt(row.anio?.toString() ?? '')
+      if (row.anio !== undefined && row.anio !== null) {
+        const anio = typeof row.anio === 'number' ? row.anio : parseInt(row.anio?.toString() ?? '')
         if (isNaN(anio) || anio < 2020 || anio > 2050) {
           result.errors.push(`Fila ${rowNum}: Año inválido "${row.anio}"`)
           result.valid = false
@@ -130,8 +129,8 @@ export const useKpiImporter = (): UseKpiImporterReturn => {
       }
 
       // Validar mes
-      if (row.mes !== undefined) {
-        const mes = parseInt(row.mes?.toString() ?? '')
+      if (row.mes !== undefined && row.mes !== null) {
+        const mes = typeof row.mes === 'number' ? row.mes : parseInt(row.mes?.toString() ?? '')
         if (isNaN(mes) || mes < 1 || mes > 12) {
           result.errors.push(`Fila ${rowNum}: Mes inválido "${row.mes}"`)
           result.valid = false
@@ -158,7 +157,7 @@ export const useKpiImporter = (): UseKpiImporterReturn => {
 
     setValidationResult(result)
     return result
-  }, [parseFile])
+  }, [])
 
   const importFile = useCallback(async (
     file: File, 
@@ -182,7 +181,13 @@ export const useKpiImporter = (): UseKpiImporterReturn => {
         }
       }
 
-      const { data } = await parseFile(file)
+      const parseResult = await parseExcelFile(file)
+      if (parseResult.errors.length > 0 || parseResult.data.length === 0) {
+        setImporting(false)
+        return { success: false, message: 'Error al leer el archivo Excel' }
+      }
+
+      const data = parseResult.data as ParsedRow[]
       
       setProgress(prev => prev ? { ...prev, total: data.length } : null)
 
@@ -199,12 +204,12 @@ export const useKpiImporter = (): UseKpiImporterReturn => {
 
           layout.columns.forEach(column => {
             const rawValue = row[column] ?? row[column.toLowerCase()]
-            record[column] = normalizeValue(rawValue?.toString(), column)
+            record[column] = normalizeValue(rawValue, column)
           })
 
           records.push(record)
         } catch (err) {
-          errors.push({ row: index + 2, message: (err as Error).message })
+          errors.push({ row: index + 1, message: (err as Error).message })
         }
       })
 
@@ -227,7 +232,7 @@ export const useKpiImporter = (): UseKpiImporterReturn => {
 
         if (error) {
           failedCount += batch.length
-          errors.push({ row: i + 2, message: error.message })
+          errors.push({ row: i + 1, message: error.message })
         } else {
           successCount += batch.length
         }
@@ -263,7 +268,7 @@ export const useKpiImporter = (): UseKpiImporterReturn => {
       setImporting(false)
       return { success: false, message: (err as Error).message }
     }
-  }, [userId, validateFile, parseFile, normalizeValue])
+  }, [userId, validateFile, normalizeValue])
 
   const reset = useCallback(() => {
     setImporting(false)

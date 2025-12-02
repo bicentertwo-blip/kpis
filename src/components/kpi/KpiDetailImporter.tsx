@@ -1,5 +1,5 @@
 /**
- * Panel de importación de CSV para detalles de KPIs
+ * Panel de importación de Excel (.xlsx) para detalles de KPIs
  * Incluye validación, preview y progreso de importación
  */
 
@@ -22,6 +22,7 @@ import type { DetailLayoutDefinition } from '@/types/kpi-definitions'
 import { useKpiImporter } from '@/hooks/useKpiImporter'
 import { useKpiExporter } from '@/hooks/useKpiExporter'
 import { cn } from '@/utils/ui'
+import { COLUMN_LABELS } from '@/utils/excel'
 
 interface KpiDetailImporterProps {
   layout: DetailLayoutDefinition
@@ -44,7 +45,7 @@ export const KpiDetailImporter = ({ layout, onImportSuccess, disabled }: KpiDeta
     reset 
   } = useKpiImporter()
   
-  const { exportEmptyLayout, exportWithSampleData } = useKpiExporter()
+  const { exporting, exportEmptyLayout, exportWithSampleData } = useKpiExporter()
 
   const handleFileSelect = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -86,12 +87,12 @@ export const KpiDetailImporter = ({ layout, onImportSuccess, disabled }: KpiDeta
     reset()
   }
 
-  const handleExportEmpty = () => {
-    exportEmptyLayout(layout)
+  const handleExportEmpty = async () => {
+    await exportEmptyLayout(layout)
   }
 
-  const handleExportSample = () => {
-    exportWithSampleData(layout, 5)
+  const handleExportSample = async () => {
+    await exportWithSampleData(layout)
   }
 
   return (
@@ -126,9 +127,10 @@ export const KpiDetailImporter = ({ layout, onImportSuccess, disabled }: KpiDeta
             {layout.columns.map((col) => (
               <span
                 key={col}
-                className="px-2 py-0.5 text-xs font-mono bg-white/50 border border-white/60 rounded-md text-soft-slate"
+                className="px-2 py-0.5 text-xs bg-white/50 border border-white/60 rounded-md text-soft-slate"
+                title={col}
               >
-                {col}
+                {COLUMN_LABELS[col] || col}
               </span>
             ))}
           </div>
@@ -138,7 +140,7 @@ export const KpiDetailImporter = ({ layout, onImportSuccess, disabled }: KpiDeta
         <input
           ref={inputRef}
           type="file"
-          accept=".csv"
+          accept=".xlsx,.xls"
           className="hidden"
           onChange={handleFileSelect}
           disabled={disabled || importing}
@@ -283,7 +285,7 @@ export const KpiDetailImporter = ({ layout, onImportSuccess, disabled }: KpiDeta
               onClick={() => inputRef.current?.click()}
               disabled={disabled || importing}
             >
-              {importing ? 'Importando...' : 'Importar CSV'}
+              {importing ? 'Importando...' : 'Importar Excel'}
             </Button>
             
             <div className="grid grid-cols-2 gap-2">
@@ -292,20 +294,20 @@ export const KpiDetailImporter = ({ layout, onImportSuccess, disabled }: KpiDeta
                 variant="ghost"
                 size="sm"
                 fullWidth
-                icon={<Download className="size-4" />}
+                icon={exporting ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
                 onClick={handleExportEmpty}
-                disabled={disabled}
+                disabled={disabled || exporting}
               >
-                Layout vacío
+                Plantilla
               </Button>
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 fullWidth
-                icon={<FileSpreadsheet className="size-4" />}
+                icon={exporting ? <Loader2 className="size-4 animate-spin" /> : <FileSpreadsheet className="size-4" />}
                 onClick={handleExportSample}
-                disabled={disabled}
+                disabled={disabled || exporting}
               >
                 Con ejemplo
               </Button>
