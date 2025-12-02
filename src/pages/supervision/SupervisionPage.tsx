@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
-import { KPI_CONFIGS } from '@/config/kpi-configs'
 import { GlassCard } from '@/components/base/GlassCard'
 import { KPI_ICON_MAP } from '@/components/kpi/iconMap'
 import { 
