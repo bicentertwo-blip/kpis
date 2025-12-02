@@ -343,16 +343,15 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
     ).slice(0, 3)
   }, [chartData])
 
-  // Detectar si los datos principales son porcentajes
-  const isPercentageData = useMemo(() => {
-    if (dataKeys.length === 0) return false
-    // Verificar si el campo principal es un porcentaje
-    return dataKeys.some(key => isPercentageField(key))
-  }, [dataKeys])
+  // Detectar si el campo principal (el primero) es porcentaje
+  const mainFieldIsPercentage = useMemo(() => {
+    if (!metrics?.field) return false
+    return isPercentageField(metrics.field)
+  }, [metrics?.field])
 
-  // Formato de números
+  // Formato de números para el eje Y (usa el campo principal)
   const formatNumber = (value: number) => {
-    if (isPercentageData) {
+    if (mainFieldIsPercentage) {
       return `${value.toFixed(1)}%`
     }
     if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`
@@ -369,18 +368,15 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
     }).format(value)
   }
 
-  // Formato inteligente basado en el tipo de campo
+  // Formato inteligente basado en el tipo de campo específico
   const formatValue = (value: number, fieldName?: string) => {
     if (fieldName && isPercentageField(fieldName)) {
-      return `${value.toFixed(1)}%`
-    }
-    if (isPercentageData) {
       return `${value.toFixed(1)}%`
     }
     return formatCurrency(value)
   }
 
-  // Tooltip personalizado
+  // Tooltip personalizado - formatea cada campo según su tipo
   const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; dataKey: string; color: string }>; label?: string }) => {
     if (!active || !payload?.length) return null
 
@@ -769,13 +765,13 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
                   <Sparkles className="size-4 text-purple-600" />
                 </div>
                 <span className="text-xs text-soft-slate">
-                  {isPercentageData 
+                  {mainFieldIsPercentage 
                     ? 'Promedio general' 
                     : `Total ${selectedYear === 'all' ? 'acumulado' : selectedYear}`}
                 </span>
               </div>
               <p className="text-lg sm:text-xl font-bold text-vision-ink truncate">
-                {isPercentageData 
+                {mainFieldIsPercentage 
                   ? formatValue(metrics.average, metrics.field)
                   : formatValue(metrics.total, metrics.field)}
               </p>
@@ -873,7 +869,7 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
                 ) : (
                   <>
                     ➡️ <strong className="text-slate-600">Estable:</strong> El indicador se mantiene sin cambios significativos. 
-                    {isPercentageData 
+                    {mainFieldIsPercentage 
                       ? `Promedio: ${formatValue(metrics.average, metrics.field)}.`
                       : `Total acumulado: ${formatValue(metrics.total, metrics.field)}.`}
                   </>
