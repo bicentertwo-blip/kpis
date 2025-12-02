@@ -1,6 +1,5 @@
 import { NavLink } from 'react-router-dom'
 import { LayoutDashboard, Settings2, ShieldCheck, LogOut } from 'lucide-react'
-import { motion } from 'framer-motion'
 import { KPI_VIEWS } from '@/utils/constants'
 import { KPI_ICON_MAP } from '@/components/kpi/iconMap'
 import { useAuthStore } from '@/store/auth'
@@ -13,31 +12,6 @@ const navBase = [
   { label: 'Supervisión', to: '/supervision', icon: ShieldCheck, viewId: 'supervision' as const },
   { label: 'Configuración', to: '/configuracion', icon: Settings2, viewId: 'configuracion' as const },
 ]
-
-// iOS-optimized animation variants
-const sidebarVariants = {
-  hidden: { 
-    opacity: 0, 
-    x: -16,
-    transform: 'translate3d(-16px, 0, 0)',
-  },
-  visible: { 
-    opacity: 1, 
-    x: 0,
-    transform: 'translate3d(0, 0, 0)',
-  },
-}
-
-const itemVariants = {
-  hidden: { 
-    opacity: 0, 
-    x: -8,
-  },
-  visible: { 
-    opacity: 1, 
-    x: 0,
-  },
-}
 
 interface SidebarProps {
   onNavigate?: () => void
@@ -58,23 +32,7 @@ export const Sidebar = ({ onNavigate }: SidebarProps) => {
   }
 
   return (
-    <motion.aside
-      variants={sidebarVariants}
-      initial="hidden"
-      animate="visible"
-      transition={{ 
-        duration: 0.35, 
-        ease: [0.25, 0.1, 0.25, 1],
-      }}
-      className="glass-panel sticky top-4 lg:top-6 flex h-[calc(100dvh-2rem)] lg:h-[calc(100dvh-3rem)] flex-col rounded-3xl lg:rounded-4xl overflow-hidden"
-      style={{
-        // iOS GPU acceleration
-        WebkitBackfaceVisibility: 'hidden',
-        backfaceVisibility: 'hidden',
-        WebkitTransform: 'translateZ(0)',
-        transform: 'translateZ(0)',
-      }}
-    >
+    <aside className="glass-panel sticky top-4 lg:top-6 flex h-[calc(100dvh-2rem)] lg:h-[calc(100dvh-3rem)] flex-col rounded-3xl lg:rounded-4xl overflow-hidden gpu-accelerated">
       {/* Header */}
       <div className="relative p-5 lg:p-6 pb-4">
         <div className="flex items-center gap-3">
@@ -83,7 +41,6 @@ export const Sidebar = ({ onNavigate }: SidebarProps) => {
               src="/logo.png" 
               alt="Logo Inteligencia de Negocios" 
               className="max-w-full max-h-full object-contain"
-              style={{ aspectRatio: 'auto' }}
             />
           </div>
           <div className="flex flex-col">
@@ -102,33 +59,26 @@ export const Sidebar = ({ onNavigate }: SidebarProps) => {
             Sin vistas activas
           </p>
         )}
-        {visibleNavLinks.map((link, index) => (
-          <motion.div
+        {visibleNavLinks.map((link) => (
+          <NavLink
             key={link.to}
-            variants={itemVariants}
-            initial="hidden"
-            animate="visible"
-            transition={{ delay: index * 0.04, duration: 0.25 }}
+            to={link.to}
+            onClick={handleNavClick}
+            className={({ isActive }) =>
+              cn(
+                'group flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium',
+                'transition-colors duration-150',
+                'touch-manipulation',
+                isActive
+                  ? 'bg-gradient-to-r from-plasma-blue to-plasma-indigo text-white shadow-glow-sm'
+                  : 'text-vision-ink hover:bg-white/60 active:bg-white/80'
+              )
+            }
+            style={{ WebkitTapHighlightColor: 'transparent' }}
           >
-            <NavLink
-              to={link.to}
-              onClick={handleNavClick}
-              className={({ isActive }) =>
-                cn(
-                  'group flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium',
-                  'transition-all duration-200 ease-smooth', // Faster transition
-                  'touch-manipulation', // iOS touch optimization
-                  isActive
-                    ? 'bg-gradient-to-r from-plasma-blue to-plasma-indigo text-white shadow-glow-sm'
-                    : 'text-vision-ink hover:bg-white/60 hover:shadow-soft active:bg-white/80'
-                )
-              }
-              style={{ WebkitTapHighlightColor: 'transparent' }}
-            >
-              <link.icon className={cn('size-[18px] transition-transform duration-200')} />
-              <span>{link.label}</span>
-            </NavLink>
-          </motion.div>
+            <link.icon className="size-[18px]" />
+            <span>{link.label}</span>
+          </NavLink>
         ))}
       </nav>
 
@@ -142,10 +92,7 @@ export const Sidebar = ({ onNavigate }: SidebarProps) => {
         
         <div 
           className="flex-1 overflow-y-auto scrollbar-hide space-y-1 pr-1"
-          style={{
-            // iOS smooth scrolling
-            WebkitOverflowScrolling: 'touch',
-          }}
+          style={{ WebkitOverflowScrolling: 'touch' }}
         >
           {visibleKpis.length === 0 && !loadingPermissions && (
             <div className="rounded-2xl border border-dashed border-soft-slate/30 px-4 py-6 text-center">
@@ -153,39 +100,32 @@ export const Sidebar = ({ onNavigate }: SidebarProps) => {
               <p className="text-[10px] text-soft-slate/60 mt-1">Solicita acceso a un administrador</p>
             </div>
           )}
-          {visibleKpis.map((view, index) => {
+          {visibleKpis.map((view) => {
             const Icon = KPI_ICON_MAP[view.icon]
             return (
-              <motion.div
+              <NavLink
                 key={view.id}
-                variants={itemVariants}
-                initial="hidden"
-                animate="visible"
-                transition={{ delay: 0.08 + index * 0.02, duration: 0.2 }}
+                to={`/${view.id}`}
+                onClick={handleNavClick}
+                className={({ isActive }) =>
+                  cn(
+                    'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm',
+                    'transition-colors duration-150',
+                    'touch-manipulation',
+                    isActive
+                      ? 'bg-white/80 shadow-soft text-vision-ink'
+                      : 'text-vision-ink/70 hover:bg-white/50 hover:text-vision-ink active:bg-white/70'
+                  )
+                }
+                style={{ WebkitTapHighlightColor: 'transparent' }}
               >
-                <NavLink
-                  to={`/${view.id}`}
-                  onClick={handleNavClick}
-                  className={({ isActive }) =>
-                    cn(
-                      'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm',
-                      'transition-all duration-200 ease-smooth', // Faster
-                      'touch-manipulation',
-                      isActive
-                        ? 'bg-white/80 shadow-soft text-vision-ink'
-                        : 'text-vision-ink/70 hover:bg-white/50 hover:text-vision-ink active:bg-white/70'
-                    )
-                  }
-                  style={{ WebkitTapHighlightColor: 'transparent' }}
-                >
-                  {Icon && (
-                    <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-plasma-blue/10 text-plasma-blue transition-all duration-200">
-                      <Icon className="size-4" />
-                    </span>
-                  )}
-                  <span className="truncate">{view.name}</span>
-                </NavLink>
-              </motion.div>
+                {Icon && (
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-plasma-blue/10 text-plasma-blue">
+                    <Icon className="size-4" />
+                  </span>
+                )}
+                <span className="truncate">{view.name}</span>
+              </NavLink>
             )
           })}
         </div>
@@ -224,6 +164,6 @@ export const Sidebar = ({ onNavigate }: SidebarProps) => {
           </Button>
         </div>
       </div>
-    </motion.aside>
+    </aside>
   )
 }
