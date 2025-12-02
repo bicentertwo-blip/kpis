@@ -88,7 +88,8 @@ export const KpiPageTemplate = ({ config }: KpiPageTemplateProps) => {
   }
 
   const renderTabNav = () => {
-    if (!hasSummaries || !hasDetails) return null
+    // Show tab nav if there are summaries (even without details)
+    if (!hasSummaries) return null
 
     return (
       <div className="flex items-center gap-1 p-1 bg-white/40 backdrop-blur-sm rounded-2xl border border-white/50 overflow-x-auto scrollbar-hide">

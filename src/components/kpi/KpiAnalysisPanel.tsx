@@ -73,7 +73,7 @@ const PIE_COLORS = ['#4F46E5', '#06B6D4', '#8B5CF6', '#F59E0B', '#10B981', '#EF4
 const MONTHS_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
 // Campos que deben mostrarse como porcentaje (coincidencia exacta)
-const PERCENTAGE_FIELDS_EXACT = new Set([
+const PERCENTAGE_FIELDS = new Set([
   'roe', 'roa', 'meta_roe', 'meta_roa',
   'indice_renovacion',
   'imor', 'crecimiento',
@@ -86,16 +86,47 @@ const PERCENTAGE_FIELDS_EXACT = new Set([
   'acuerdos_cumplidos'
 ])
 
-// Función para detectar si un campo es porcentaje
-const isPercentageField = (fieldName: string): boolean => {
+// Campos que deben mostrarse como números simples (días, conteos, scores, etc.)
+const SIMPLE_NUMBER_FIELDS = new Set([
+  // Días
+  'dias_sin_cubrir', 'meta_dias', 'dias',
+  // Conteos de personal
+  'vacantes', 'contrataciones', 'bajas',
+  'empleados', 'total_empleados', 'hc', 'ingresos',
+  'count', 'cantidad',
+  // NPS y scores
+  'nps',
+  // Innovación
+  'ideas_registradas', 'proyectos_activos',
+  // Riesgos
+  'riesgos_activos', 'riesgos_mitigados', 'incidentes_criticos', 'riesgos_nuevos',
+  // Gobierno corporativo
+  'reuniones_consejo', 'actualizaciones_politica', 'sesiones',
+  // Cumplimiento
+  'observaciones_cnbv_condusef', 'observaciones',
+  // Alcance (números grandes pero no moneda)
+  'alcance_campanas'
+])
+
+// Tipos de formato de campo
+type FieldFormatType = 'percentage' | 'number' | 'currency'
+
+// Función para detectar el tipo de formato de un campo
+const getFieldFormatType = (fieldName: string): FieldFormatType => {
   const lowerField = fieldName.toLowerCase()
-  // Coincidencia exacta primero
-  if (PERCENTAGE_FIELDS_EXACT.has(lowerField)) return true
-  // Patrones específicos que indican porcentaje
-  if (lowerField.endsWith('_pct')) return true
-  if (lowerField.endsWith('_%')) return true
-  // No usar "includes" genérico para evitar falsos positivos
-  return false
+  
+  // Porcentajes
+  if (PERCENTAGE_FIELDS.has(lowerField)) return 'percentage'
+  if (lowerField.endsWith('_pct')) return 'percentage'
+  if (lowerField.endsWith('_%')) return 'percentage'
+  
+  // Números simples (días, conteos)
+  if (SIMPLE_NUMBER_FIELDS.has(lowerField)) return 'number'
+  if (lowerField.includes('dias')) return 'number'
+  if (lowerField.includes('count')) return 'number'
+  
+  // Por defecto, moneda
+  return 'currency'
 }
 
 export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => {
@@ -343,21 +374,11 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
     ).slice(0, 3)
   }, [chartData])
 
-  // Detectar si el campo principal (el primero) es porcentaje
-  const mainFieldIsPercentage = useMemo(() => {
-    if (!metrics?.field) return false
-    return isPercentageField(metrics.field)
+  // Detectar el tipo de formato del campo principal
+  const mainFieldFormatType = useMemo(() => {
+    if (!metrics?.field) return 'currency' as FieldFormatType
+    return getFieldFormatType(metrics.field)
   }, [metrics?.field])
-
-  // Formato de números para el eje Y (usa el campo principal)
-  const formatNumber = (value: number) => {
-    if (mainFieldIsPercentage) {
-      return `${value.toFixed(1)}%`
-    }
-    if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`
-    if (value >= 1000) return `${(value / 1000).toFixed(1)}K`
-    return value.toFixed(0)
-  }
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-MX', {
@@ -368,12 +389,39 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
     }).format(value)
   }
 
+  const formatSimpleNumber = (value: number) => {
+    if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`
+    if (value >= 1000) return `${(value / 1000).toFixed(1)}K`
+    return value.toLocaleString('es-MX', { maximumFractionDigits: 1 })
+  }
+
+  // Formato de números para el eje Y (usa el campo principal)
+  const formatNumber = (value: number) => {
+    switch (mainFieldFormatType) {
+      case 'percentage':
+        return `${value.toFixed(1)}%`
+      case 'number':
+        return formatSimpleNumber(value)
+      case 'currency':
+      default:
+        if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`
+        if (value >= 1000) return `${(value / 1000).toFixed(1)}K`
+        return value.toFixed(0)
+    }
+  }
+
   // Formato inteligente basado en el tipo de campo específico
   const formatValue = (value: number, fieldName?: string) => {
-    if (fieldName && isPercentageField(fieldName)) {
-      return `${value.toFixed(1)}%`
+    const formatType = fieldName ? getFieldFormatType(fieldName) : mainFieldFormatType
+    switch (formatType) {
+      case 'percentage':
+        return `${value.toFixed(1)}%`
+      case 'number':
+        return formatSimpleNumber(value)
+      case 'currency':
+      default:
+        return formatCurrency(value)
     }
-    return formatCurrency(value)
   }
 
   // Tooltip personalizado - formatea cada campo según su tipo
@@ -765,13 +813,13 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
                   <Sparkles className="size-4 text-purple-600" />
                 </div>
                 <span className="text-xs text-soft-slate">
-                  {mainFieldIsPercentage 
+                  {mainFieldFormatType === 'percentage' 
                     ? 'Promedio general' 
                     : `Total ${selectedYear === 'all' ? 'acumulado' : selectedYear}`}
                 </span>
               </div>
               <p className="text-lg sm:text-xl font-bold text-vision-ink truncate">
-                {mainFieldIsPercentage 
+                {mainFieldFormatType === 'percentage' 
                   ? formatValue(metrics.average, metrics.field)
                   : formatValue(metrics.total, metrics.field)}
               </p>
@@ -869,7 +917,7 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
                 ) : (
                   <>
                     ➡️ <strong className="text-slate-600">Estable:</strong> El indicador se mantiene sin cambios significativos. 
-                    {mainFieldIsPercentage 
+                    {mainFieldFormatType === 'percentage' 
                       ? `Promedio: ${formatValue(metrics.average, metrics.field)}.`
                       : `Total acumulado: ${formatValue(metrics.total, metrics.field)}.`}
                   </>
