@@ -69,6 +69,7 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
   const [detalleData, setDetalleData] = useState<DataPoint[]>([])
   const [selectedYear, setSelectedYear] = useState(filters?.anio || new Date().getFullYear())
   const [showYearFilter, setShowYearFilter] = useState(false)
+  const [lastUploadInfo, setLastUploadInfo] = useState<{ date: string; count: number } | null>(null)
   
   const userId = useAuthStore((state) => state.session?.user.id)
 
@@ -83,12 +84,11 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
       setLoading(true)
 
       try {
-        // Cargar datos de resumen
+        // Cargar datos de resumen (todos los usuarios pueden ver todos los datos)
         if (resumenTable) {
           const { data: resumen } = await supabase
             .from(resumenTable)
             .select('*')
-            .eq('owner_id', userId)
             .eq('anio', selectedYear)
             .order('mes', { ascending: true })
 
@@ -100,37 +100,72 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
           }
         }
 
-        // Cargar datos de detalle (agregados por mes)
+        // Cargar datos de detalle - mostrar la última carga
         if (detalleTable) {
-          const { data: detalle } = await supabase
+          // Primero obtener la fecha de la última carga
+          const { data: lastRecord } = await supabase
             .from(detalleTable)
-            .select('*')
-            .eq('owner_id', userId)
+            .select('created_at')
             .eq('anio', selectedYear)
-            .order('mes', { ascending: true })
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single()
 
-          if (detalle) {
-            // Agrupar por mes para el detalle
-            const grouped = (detalle as Record<string, unknown>[]).reduce((acc: Record<number, DataPoint>, curr) => {
-              const mes = curr.mes as number
-              if (!acc[mes]) {
-                acc[mes] = {
-                  periodo: `${MONTHS_SHORT[mes - 1]} ${curr.anio}`,
-                  mes,
-                  anio: curr.anio as number,
-                  count: 0,
-                }
-              }
-              acc[mes].count = (acc[mes].count as number) + 1
-              // Sumar valores numéricos
-              Object.keys(curr).forEach((key) => {
-                if (typeof curr[key] === 'number' && !['mes', 'anio'].includes(key)) {
-                  acc[mes][key] = ((acc[mes][key] as number) || 0) + (curr[key] as number)
-                }
+          if (lastRecord) {
+            const lastUploadDate = new Date(lastRecord.created_at as string)
+            // Buscar todos los registros de esa carga (mismo timestamp +/- 1 minuto)
+            const startTime = new Date(lastUploadDate.getTime() - 60000).toISOString()
+            const endTime = new Date(lastUploadDate.getTime() + 60000).toISOString()
+
+            const { data: detalle } = await supabase
+              .from(detalleTable)
+              .select('*')
+              .eq('anio', selectedYear)
+              .gte('created_at', startTime)
+              .lte('created_at', endTime)
+              .order('mes', { ascending: true })
+
+            if (detalle && detalle.length > 0) {
+              // Guardar info de la última carga
+              setLastUploadInfo({
+                date: lastUploadDate.toLocaleDateString('es-MX', { 
+                  day: 'numeric', 
+                  month: 'short', 
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                }),
+                count: detalle.length
               })
-              return acc
-            }, {})
-            setDetalleData(Object.values(grouped))
+
+              // Agrupar por mes para el detalle
+              const grouped = (detalle as Record<string, unknown>[]).reduce((acc: Record<number, DataPoint>, curr) => {
+                const mes = curr.mes as number
+                if (!acc[mes]) {
+                  acc[mes] = {
+                    periodo: `${MONTHS_SHORT[mes - 1]} ${curr.anio}`,
+                    mes,
+                    anio: curr.anio as number,
+                    count: 0,
+                  }
+                }
+                acc[mes].count = (acc[mes].count as number) + 1
+                // Sumar valores numéricos
+                Object.keys(curr).forEach((key) => {
+                  if (typeof curr[key] === 'number' && !['mes', 'anio'].includes(key)) {
+                    acc[mes][key] = ((acc[mes][key] as number) || 0) + (curr[key] as number)
+                  }
+                })
+                return acc
+              }, {})
+              setDetalleData(Object.values(grouped))
+            } else {
+              setDetalleData([])
+              setLastUploadInfo(null)
+            }
+          } else {
+            setDetalleData([])
+            setLastUploadInfo(null)
           }
         }
       } catch (error) {
@@ -532,6 +567,15 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
             <p className="text-xs text-soft-slate mt-0.5">
               Evolución mensual • {selectedYear}
             </p>
+            {/* Info de última carga para detalles */}
+            {activeView === 'detalle' && lastUploadInfo && (
+              <div className="flex items-center gap-2 mt-2 px-2 py-1 bg-plasma-blue/5 rounded-lg border border-plasma-blue/20">
+                <div className="w-2 h-2 rounded-full bg-plasma-blue animate-pulse" />
+                <span className="text-xs text-plasma-blue font-medium">
+                  Última carga: {lastUploadInfo.date} • {lastUploadInfo.count} registros
+                </span>
+              </div>
+            )}
           </div>
           
           {loading && (

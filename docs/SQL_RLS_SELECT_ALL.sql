@@ -1,11 +1,13 @@
 -- =====================================================
--- SQL PARA PERMITIR QUE TODOS LOS USUARIOS VEAN TODOS LOS DATOS
+-- SQL PARA POLÍTICAS RLS - TODOS PUEDEN VER, CREAR Y EDITAR
 -- Ejecutar en Supabase SQL Editor
 -- =====================================================
 
--- Este script actualiza las políticas de SELECT para que
--- cualquier usuario autenticado pueda ver TODOS los registros
--- Las políticas de INSERT, UPDATE y DELETE siguen siendo solo para el owner
+-- Este script actualiza las políticas para que:
+-- - Cualquier usuario autenticado puede VER todos los registros
+-- - Cualquier usuario autenticado puede CREAR registros
+-- - Cualquier usuario autenticado puede EDITAR registros
+-- - NADIE puede BORRAR (solo desde Supabase directamente)
 
 DO $$
 DECLARE
@@ -34,11 +36,16 @@ DECLARE
 BEGIN
     FOREACH table_name IN ARRAY tables
     LOOP
-        -- Eliminar política SELECT existente
+        -- Eliminar TODAS las políticas existentes
         EXECUTE format('DROP POLICY IF EXISTS "%s_select_own" ON %I', table_name, table_name);
         EXECUTE format('DROP POLICY IF EXISTS "%s_select_all" ON %I', table_name, table_name);
+        EXECUTE format('DROP POLICY IF EXISTS "%s_insert_own" ON %I', table_name, table_name);
+        EXECUTE format('DROP POLICY IF EXISTS "%s_insert_all" ON %I', table_name, table_name);
+        EXECUTE format('DROP POLICY IF EXISTS "%s_update_own" ON %I', table_name, table_name);
+        EXECUTE format('DROP POLICY IF EXISTS "%s_update_all" ON %I', table_name, table_name);
+        EXECUTE format('DROP POLICY IF EXISTS "%s_delete_own" ON %I', table_name, table_name);
         
-        -- Nueva política SELECT: TODOS los usuarios autenticados pueden ver TODOS los registros
+        -- SELECT: Todos los usuarios autenticados pueden ver todos los registros
         EXECUTE format('
             CREATE POLICY "%s_select_all" ON %I
             FOR SELECT 
@@ -46,7 +53,26 @@ BEGIN
             USING (true)
         ', table_name, table_name);
         
-        RAISE NOTICE 'Política SELECT actualizada para: %', table_name;
+        -- INSERT: Todos los usuarios autenticados pueden crear registros
+        EXECUTE format('
+            CREATE POLICY "%s_insert_all" ON %I
+            FOR INSERT 
+            TO authenticated
+            WITH CHECK (true)
+        ', table_name, table_name);
+        
+        -- UPDATE: Todos los usuarios autenticados pueden editar registros
+        EXECUTE format('
+            CREATE POLICY "%s_update_all" ON %I
+            FOR UPDATE 
+            TO authenticated
+            USING (true)
+        ', table_name, table_name);
+        
+        -- DELETE: NO hay política = NADIE puede borrar desde la app
+        -- Solo se puede borrar desde Supabase Dashboard directamente
+        
+        RAISE NOTICE 'Políticas actualizadas para: %', table_name;
     END LOOP;
 END $$;
 

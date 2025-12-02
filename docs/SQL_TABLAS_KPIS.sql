@@ -924,8 +924,8 @@ ALTER TABLE kpi_gobierno_corporativo_detalle ENABLE ROW LEVEL SECURITY;
 -- FUNCIÓN PARA CREAR POLÍTICAS RLS AUTOMÁTICAMENTE
 -- =====================================================
 
--- Política: SELECT para TODOS los usuarios autenticados (pueden ver todos los datos)
--- Políticas: INSERT, UPDATE, DELETE solo para el owner
+-- Política: SELECT, INSERT, UPDATE para TODOS los usuarios autenticados
+-- Política: DELETE = NO existe (nadie puede borrar desde la app)
 
 DO $$
 DECLARE
@@ -954,14 +954,16 @@ DECLARE
 BEGIN
     FOREACH table_name IN ARRAY tables
     LOOP
-        -- Eliminar políticas existentes si existen
+        -- Eliminar TODAS las políticas existentes
         EXECUTE format('DROP POLICY IF EXISTS "%s_select_own" ON %I', table_name, table_name);
         EXECUTE format('DROP POLICY IF EXISTS "%s_select_all" ON %I', table_name, table_name);
         EXECUTE format('DROP POLICY IF EXISTS "%s_insert_own" ON %I', table_name, table_name);
+        EXECUTE format('DROP POLICY IF EXISTS "%s_insert_all" ON %I', table_name, table_name);
         EXECUTE format('DROP POLICY IF EXISTS "%s_update_own" ON %I', table_name, table_name);
+        EXECUTE format('DROP POLICY IF EXISTS "%s_update_all" ON %I', table_name, table_name);
         EXECUTE format('DROP POLICY IF EXISTS "%s_delete_own" ON %I', table_name, table_name);
         
-        -- Política SELECT: TODOS los usuarios autenticados pueden ver TODOS los registros
+        -- SELECT: Todos los usuarios autenticados pueden ver todos los registros
         EXECUTE format('
             CREATE POLICY "%s_select_all" ON %I
             FOR SELECT 
@@ -969,23 +971,23 @@ BEGIN
             USING (true)
         ', table_name, table_name);
         
-        -- Política INSERT: usuario puede insertar con su ID
+        -- INSERT: Todos los usuarios autenticados pueden crear registros
         EXECUTE format('
-            CREATE POLICY "%s_insert_own" ON %I
-            FOR INSERT WITH CHECK (auth.uid() = owner_id)
+            CREATE POLICY "%s_insert_all" ON %I
+            FOR INSERT 
+            TO authenticated
+            WITH CHECK (true)
         ', table_name, table_name);
         
-        -- Política UPDATE: usuario puede actualizar sus propios registros
+        -- UPDATE: Todos los usuarios autenticados pueden editar registros
         EXECUTE format('
-            CREATE POLICY "%s_update_own" ON %I
-            FOR UPDATE USING (auth.uid() = owner_id)
+            CREATE POLICY "%s_update_all" ON %I
+            FOR UPDATE 
+            TO authenticated
+            USING (true)
         ', table_name, table_name);
         
-        -- Política DELETE: usuario puede eliminar sus propios registros
-        EXECUTE format('
-            CREATE POLICY "%s_delete_own" ON %I
-            FOR DELETE USING (auth.uid() = owner_id)
-        ', table_name, table_name);
+        -- DELETE: NO hay política = NADIE puede borrar desde la app
     END LOOP;
 END $$;
 
