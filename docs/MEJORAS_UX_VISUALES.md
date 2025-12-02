@@ -108,8 +108,8 @@ Se realizó un rebranding completo de la aplicación:
 - Documentación actualizada (3 archivos .md)
 
 **Jerarquía visual del branding:**
-- **KPIs** = Producto (texto grande, gradiente azul-índigo, bold)
-- **Inteligencia de Negocios** = Marca (subtítulo, uppercase, tracking)
+- **KPIs** = Producto (texto grande, gradiente azul-índigo, extrabold)
+- **Inteligencia de Negocios** = Marca (subtítulo, uppercase, tracking, con líneas decorativas)
 
 **Iconos de app (PWA/iPhone):**
 - Fondo blanco
@@ -117,9 +117,32 @@ Se realizó un rebranding completo de la aplicación:
 - Subtítulo "INTELIGENCIA DE NEGOCIOS" en azul
 - Generados automáticamente via PowerShell + System.Drawing
 
+### ✅ Eliminación de Parpadeo en Sidebar iOS (Diciembre 2025)
+
+Se eliminó el parpadeo al abrir el sidebar en iPhone:
+
+**Cambios realizados:**
+- Eliminado Framer Motion del Sidebar completamente
+- Solo transiciones CSS simples (`transition-colors duration-150`)
+- Removido `backdrop-blur` del overlay móvil (causa principal del flickering)
+- Animación del sidebar usa `tween` en vez de `spring` (más predecible)
+- Duración de animación reducida a 0.25s
+- Agregada clase `gpu-accelerated` a elementos críticos
+
+**Archivos modificados:**
+- `Sidebar.tsx` - Sin Framer Motion, solo CSS
+- `AppShell.tsx` - Animaciones simplificadas
+
 ---
 
 ## Mejoras en Login
+
+### ✅ IMPLEMENTADO - Branding mejorado
+El login ahora muestra:
+- Logo corporativo centrado arriba del formulario
+- **"KPIs"** como título principal con gradiente azul-índigo
+- **"INTELIGENCIA DE NEGOCIOS"** como subtítulo con líneas decorativas
+- Footer actualizado con el nombre de la marca
 
 ### 🔴 Alta Prioridad
 
@@ -142,16 +165,10 @@ Se realizó un rebranding completo de la aplicación:
 </button>
 ```
 
-### 🟡 Media Prioridad
+### ~~🟡 Media Prioridad~~
 
-#### 3. Agregar branding más prominente
-**Observación**: El logo es pequeño y genérico (solo icono de Sparkles).
-```
-Sugerencias:
-- Agregar logo de la empresa/organización
-- Incluir tagline: "Panel Ejecutivo de Indicadores"
-- Versión del sistema en el footer
-```
+#### ~~3. Agregar branding más prominente~~ ✅ IMPLEMENTADO
+~~El logo ahora es prominente con el texto "KPIs" en gradiente y "Inteligencia de Negocios" como subtítulo.~~
 
 #### 4. Mejorar feedback de carga
 **Problema actual**: Solo cambia el texto del botón a "Accediendo...".
@@ -162,10 +179,10 @@ Sugerencias:
 - Mostrar barra de progreso sutil
 ```
 
-### 🟢 Baja Prioridad
+### ~~🟢 Baja Prioridad~~
 
-#### 5. Animación de entrada del formulario
-El formulario aparece sin animación. Agregar entrada suave desde abajo.
+#### ~~5. Animación de entrada del formulario~~ ✅ IMPLEMENTADO
+~~El formulario ahora tiene animaciones de entrada con Framer Motion (fade + slide up).~~
 
 #### 6. Ilustración o imagen de fondo
 Considerar agregar ilustración abstracta relacionada con datos/analytics.
@@ -694,7 +711,7 @@ Usar React Query o SWR para cachear y revalidar datos.
 
 ---
 
-**Versión del documento**: 1.2  
+**Versión del documento**: 1.3  
 **Fecha de última actualización**: 2 de Diciembre 2025  
 **Autor**: GitHub Copilot (Análisis basado en código y capturas)
 
@@ -702,6 +719,7 @@ Usar React Query o SWR para cachear y revalidar datos.
 
 | Versión | Fecha | Cambios |
 |---------|-------|---------|
+| 1.3 | 02/12/2025 | Fix parpadeo sidebar iOS (eliminado Framer Motion), marcadas mejoras de login como completadas |
 | 1.2 | 02/12/2025 | Agregado rebranding completo "KPIs - Inteligencia de Negocios", iconos PWA/iPhone generados |
 | 1.1 | 02/12/2025 | Agregada sección de mejoras implementadas. Marcadas como completadas: Supervisión (rediseño), optimizaciones iOS |
 | 1.0 | 01/12/2025 | Versión inicial del documento |

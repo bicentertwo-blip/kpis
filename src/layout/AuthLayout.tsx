@@ -97,7 +97,7 @@ export const AuthLayout = () => (
       transition={{ delay: 0.8 }}
       className="mt-6 sm:mt-8 text-xs text-soft-slate/60 text-center"
     >
-      © 2025 KPIs - Inteligencia de Negocios. Todos los derechos reservados.
+      © 2025 Credicer - KPIs. Todos los derechos reservados.
     </motion.p>
   </div>
 )
