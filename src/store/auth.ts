@@ -137,12 +137,12 @@ export const useAuthStore = create<AuthStoreState>()(
         set({ session: null, profile: null })
       },
       requestPasswordReset: async (email) => {
-        const redirectUrl = new URL('/auth/callback', window.location.origin)
-        redirectUrl.searchParams.set('next', '/set-password')
+        const redirectUrl = `${window.location.origin}/auth/callback`
 
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: redirectUrl.toString(),
+          redirectTo: redirectUrl,
         })
+        
         if (error) throw error
       },
       updatePassword: async (password) => {

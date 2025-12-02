@@ -14,11 +14,13 @@ import {
   CheckCircle2,
   Circle,
   Lightbulb,
-  Database
+  Database,
+  BarChart3,
 } from 'lucide-react'
 import type { KpiDefinition, SectionDefinition, DetailLayoutDefinition } from '@/types/kpi-definitions'
 import { KpiSummaryForm } from './KpiSummaryForm'
 import { KpiDetailImporter } from './KpiDetailImporter'
+import { KpiAnalysisPanel } from './KpiAnalysisPanel'
 import { KpiHeaderNew } from './KpiHeaderNew'
 import { GlassCard } from '@/components/base/GlassCard'
 import { Button } from '@/components/base/Button'
@@ -28,10 +30,10 @@ interface KpiPageTemplateProps {
   config: KpiDefinition
 }
 
-type TabType = 'summary' | 'detail'
+type TabType = 'analysis' | 'summary' | 'detail'
 
 export const KpiPageTemplate = ({ config }: KpiPageTemplateProps) => {
-  const [activeTab, setActiveTab] = useState<TabType>('summary')
+  const [activeTab, setActiveTab] = useState<TabType>('analysis')
   const [activeSummaryIndex, setActiveSummaryIndex] = useState(0)
   const [activeDetailIndex, setActiveDetailIndex] = useState(0)
   const [selectedYear] = useState(new Date().getFullYear())
@@ -89,19 +91,32 @@ export const KpiPageTemplate = ({ config }: KpiPageTemplateProps) => {
     if (!hasSummaries || !hasDetails) return null
 
     return (
-      <div className="flex items-center p-1 bg-white/40 backdrop-blur-sm rounded-2xl border border-white/50">
+      <div className="flex items-center gap-1 p-1 bg-white/40 backdrop-blur-sm rounded-2xl border border-white/50 overflow-x-auto scrollbar-hide">
+        <button
+          onClick={() => setActiveTab('analysis')}
+          className={cn(
+            'flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl min-w-max',
+            'text-sm font-medium transition-all duration-200',
+            activeTab === 'analysis'
+              ? 'bg-gradient-to-r from-plasma-blue to-indigo-500 text-white shadow-lg shadow-plasma-blue/25'
+              : 'text-soft-slate hover:text-vision-ink hover:bg-white/50'
+          )}
+        >
+          <BarChart3 className="size-4" />
+          <span className="hidden sm:inline">Análisis</span>
+        </button>
         <button
           onClick={() => setActiveTab('summary')}
           className={cn(
-            'flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl',
+            'flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl min-w-max',
             'text-sm font-medium transition-all duration-200',
             activeTab === 'summary'
               ? 'bg-white text-vision-ink shadow-soft'
-              : 'text-soft-slate hover:text-vision-ink'
+              : 'text-soft-slate hover:text-vision-ink hover:bg-white/50'
           )}
         >
           <FileText className="size-4" />
-          <span>Resumen</span>
+          <span className="hidden sm:inline">Resumen</span>
           {hasMultipleSummaries && (
             <span className="px-1.5 py-0.5 text-xs rounded-md bg-plasma-blue/10 text-plasma-blue">
               {config.summaries.length}
@@ -111,15 +126,15 @@ export const KpiPageTemplate = ({ config }: KpiPageTemplateProps) => {
         <button
           onClick={() => setActiveTab('detail')}
           className={cn(
-            'flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl',
+            'flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl min-w-max',
             'text-sm font-medium transition-all duration-200',
             activeTab === 'detail'
               ? 'bg-white text-vision-ink shadow-soft'
-              : 'text-soft-slate hover:text-vision-ink'
+              : 'text-soft-slate hover:text-vision-ink hover:bg-white/50'
           )}
         >
           <Upload className="size-4" />
-          <span>Importar Detalle</span>
+          <span className="hidden sm:inline">Importar</span>
           {hasMultipleDetails && (
             <span className="px-1.5 py-0.5 text-xs rounded-md bg-plasma-blue/10 text-plasma-blue">
               {config.details.length}
@@ -295,7 +310,19 @@ export const KpiPageTemplate = ({ config }: KpiPageTemplateProps) => {
 
           {/* Contenido según tab activo */}
           <AnimatePresence mode="wait">
-            {activeTab === 'summary' ? (
+            {activeTab === 'analysis' ? (
+              <motion.div
+                key="analysis"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+              >
+                <KpiAnalysisPanel 
+                  config={config}
+                  filters={{ anio: selectedYear, mes: selectedMonth }}
+                />
+              </motion.div>
+            ) : activeTab === 'summary' ? (
               <motion.div
                 key="summary"
                 initial={{ opacity: 0, y: 10 }}
@@ -378,7 +405,9 @@ export const KpiPageTemplate = ({ config }: KpiPageTemplateProps) => {
               <div>
                 <p className="text-sm font-semibold text-vision-ink">Tip rápido</p>
                 <p className="text-xs text-soft-slate mt-1 leading-relaxed">
-                  {activeTab === 'summary' 
+                  {activeTab === 'analysis'
+                    ? 'Visualiza tendencias y métricas clave. Alterna entre la vista resumida y el análisis detallado.'
+                    : activeTab === 'summary' 
                     ? 'Los datos se guardan automáticamente. Completa todos los campos requeridos marcados con *.'
                     : 'Descarga el layout vacío, llénalo en Excel y vuelve a importarlo. Asegúrate de no cambiar los encabezados.'}
                 </p>
