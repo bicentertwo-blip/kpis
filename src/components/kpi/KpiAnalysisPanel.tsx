@@ -72,6 +72,32 @@ const PIE_COLORS = ['#4F46E5', '#06B6D4', '#8B5CF6', '#F59E0B', '#10B981', '#EF4
 
 const MONTHS_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
+// Campos que deben mostrarse como porcentaje
+const PERCENTAGE_FIELDS = [
+  'roe', 'roa', 'meta_roe', 'meta_roa',
+  'indice_renovacion',
+  'imor', 'crecimiento',
+  'indice_rotacion', 'ausentismo', 'permanencia_12m',
+  'procesos_digitalizados', 'transacciones_automaticas',
+  'recordacion_marca',
+  'quejas_72h', 'clima_laboral',
+  'reportes_a_tiempo',
+  'exposicion',
+  'acuerdos_cumplidos',
+  'meta' // La meta también puede ser porcentaje en algunos contextos
+]
+
+// Función para detectar si un campo es porcentaje
+const isPercentageField = (fieldName: string): boolean => {
+  const lowerField = fieldName.toLowerCase()
+  return PERCENTAGE_FIELDS.some(pf => lowerField.includes(pf)) ||
+    lowerField.includes('porcentaje') ||
+    lowerField.includes('indice') ||
+    lowerField.includes('tasa') ||
+    lowerField.endsWith('_pct') ||
+    lowerField.endsWith('_%')
+}
+
 export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => {
   const [activeView, setActiveView] = useState<AnalysisView>('resumen')
   const [chartType, setChartType] = useState<ChartType>('area')
@@ -317,8 +343,18 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
     ).slice(0, 3)
   }, [chartData])
 
+  // Detectar si los datos principales son porcentajes
+  const isPercentageData = useMemo(() => {
+    if (dataKeys.length === 0) return false
+    // Verificar si el campo principal es un porcentaje
+    return dataKeys.some(key => isPercentageField(key))
+  }, [dataKeys])
+
   // Formato de números
   const formatNumber = (value: number) => {
+    if (isPercentageData) {
+      return `${value.toFixed(1)}%`
+    }
     if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`
     if (value >= 1000) return `${(value / 1000).toFixed(1)}K`
     return value.toFixed(0)
@@ -331,6 +367,17 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value)
+  }
+
+  // Formato inteligente basado en el tipo de campo
+  const formatValue = (value: number, fieldName?: string) => {
+    if (fieldName && isPercentageField(fieldName)) {
+      return `${value.toFixed(1)}%`
+    }
+    if (isPercentageData) {
+      return `${value.toFixed(1)}%`
+    }
+    return formatCurrency(value)
   }
 
   // Tooltip personalizado
@@ -347,7 +394,7 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
               style={{ backgroundColor: entry.color }}
             />
             <span className="text-soft-slate capitalize">{entry.dataKey.replace(/_/g, ' ')}:</span>
-            <span className="font-semibold text-vision-ink">{formatCurrency(entry.value)}</span>
+            <span className="font-semibold text-vision-ink">{formatValue(entry.value, entry.dataKey)}</span>
           </div>
         ))}
       </div>
@@ -672,7 +719,7 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
                 <span className="text-xs text-soft-slate">Último período</span>
               </div>
               <p className="text-lg sm:text-xl font-bold text-vision-ink truncate">
-                {formatCurrency(metrics.current)}
+                {formatValue(metrics.current, metrics.field)}
               </p>
               <div className={cn(
                 'flex items-center gap-1 mt-1 text-xs font-medium',
@@ -695,7 +742,7 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
                 <span className="text-xs text-soft-slate">Promedio</span>
               </div>
               <p className="text-lg sm:text-xl font-bold text-vision-ink truncate">
-                {formatCurrency(metrics.average)}
+                {formatValue(metrics.average, metrics.field)}
               </p>
               <p className="text-xs text-soft-slate mt-1">
                 {chartData.length} períodos
@@ -711,20 +758,26 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
                 <span className="text-xs text-soft-slate">Máximo</span>
               </div>
               <p className="text-lg sm:text-xl font-bold text-vision-ink truncate">
-                {formatCurrency(metrics.max)}
+                {formatValue(metrics.max, metrics.field)}
               </p>
             </div>
 
-            {/* Total acumulado */}
+            {/* Total/Promedio acumulado - para porcentajes mostramos promedio, para montos total */}
             <div className="glass-panel rounded-2xl p-4 border border-white/60">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-xl bg-purple-100 flex items-center justify-center">
                   <Sparkles className="size-4 text-purple-600" />
                 </div>
-                <span className="text-xs text-soft-slate">Total {selectedYear === 'all' ? 'acumulado' : selectedYear}</span>
+                <span className="text-xs text-soft-slate">
+                  {isPercentageData 
+                    ? 'Promedio general' 
+                    : `Total ${selectedYear === 'all' ? 'acumulado' : selectedYear}`}
+                </span>
               </div>
               <p className="text-lg sm:text-xl font-bold text-vision-ink truncate">
-                {formatCurrency(metrics.total)}
+                {isPercentageData 
+                  ? formatValue(metrics.average, metrics.field)
+                  : formatValue(metrics.total, metrics.field)}
               </p>
             </div>
           </motion.div>
@@ -810,7 +863,7 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
                 {metrics.trend === 'up' ? (
                   <>
                     📈 <strong className="text-emerald-600">Tendencia positiva:</strong> El indicador creció {Math.abs(metrics.change).toFixed(1)}% respecto al período anterior. 
-                    El promedio anual es {formatCurrency(metrics.average)}.
+                    El promedio es {formatValue(metrics.average, metrics.field)}.
                   </>
                 ) : metrics.trend === 'down' ? (
                   <>
@@ -820,7 +873,9 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
                 ) : (
                   <>
                     ➡️ <strong className="text-slate-600">Estable:</strong> El indicador se mantiene sin cambios significativos. 
-                    Total acumulado: {formatCurrency(metrics.total)}.
+                    {isPercentageData 
+                      ? `Promedio: ${formatValue(metrics.average, metrics.field)}.`
+                      : `Total acumulado: ${formatValue(metrics.total, metrics.field)}.`}
                   </>
                 )}
               </p>
