@@ -924,6 +924,9 @@ ALTER TABLE kpi_gobierno_corporativo_detalle ENABLE ROW LEVEL SECURITY;
 -- FUNCIÓN PARA CREAR POLÍTICAS RLS AUTOMÁTICAMENTE
 -- =====================================================
 
+-- Política: SELECT para TODOS los usuarios autenticados (pueden ver todos los datos)
+-- Políticas: INSERT, UPDATE, DELETE solo para el owner
+
 DO $$
 DECLARE
     table_name TEXT;
@@ -953,14 +956,17 @@ BEGIN
     LOOP
         -- Eliminar políticas existentes si existen
         EXECUTE format('DROP POLICY IF EXISTS "%s_select_own" ON %I', table_name, table_name);
+        EXECUTE format('DROP POLICY IF EXISTS "%s_select_all" ON %I', table_name, table_name);
         EXECUTE format('DROP POLICY IF EXISTS "%s_insert_own" ON %I', table_name, table_name);
         EXECUTE format('DROP POLICY IF EXISTS "%s_update_own" ON %I', table_name, table_name);
         EXECUTE format('DROP POLICY IF EXISTS "%s_delete_own" ON %I', table_name, table_name);
         
-        -- Política SELECT: usuario puede ver sus propios registros
+        -- Política SELECT: TODOS los usuarios autenticados pueden ver TODOS los registros
         EXECUTE format('
-            CREATE POLICY "%s_select_own" ON %I
-            FOR SELECT USING (auth.uid() = owner_id)
+            CREATE POLICY "%s_select_all" ON %I
+            FOR SELECT 
+            TO authenticated
+            USING (true)
         ', table_name, table_name);
         
         -- Política INSERT: usuario puede insertar con su ID
