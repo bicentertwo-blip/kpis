@@ -16,12 +16,15 @@ export const ResetPasswordPage = () => {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <label className="block space-y-2 text-sm">
-        <span>Email corporativo</span>
+        <span className="text-vision-ink font-medium">Email corporativo</span>
         <input
-          className="w-full rounded-2xl border border-white/60 bg-white/80 px-4 py-3 text-vision-ink outline-none focus:border-plasma-blue/40"
+          className="glass-input"
           type="email"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
+          placeholder="tu@empresa.com"
+          required
+          aria-label="Email corporativo"
         />
       </label>
       {feedback && <p className="text-xs text-soft-slate">{feedback}</p>}

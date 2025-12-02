@@ -83,23 +83,29 @@ export const SetPasswordPage = () => {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <label className="block space-y-2 text-sm">
-        <span>Nueva contraseña</span>
+        <span className="text-vision-ink font-medium">Nueva contraseña</span>
         <input
           type="password"
-          className="w-full rounded-2xl border border-white/60 bg-white/80 px-4 py-3 text-vision-ink outline-none focus:border-plasma-blue/40"
+          className="glass-input"
           value={passwords.password}
           onChange={(event) => setPasswords((prev) => ({ ...prev, password: event.target.value }))}
           disabled={status !== 'ready'}
+          placeholder="Mínimo 6 caracteres"
+          required
+          aria-label="Nueva contraseña"
         />
       </label>
       <label className="block space-y-2 text-sm">
-        <span>Confirmar contraseña</span>
+        <span className="text-vision-ink font-medium">Confirmar contraseña</span>
         <input
           type="password"
-          className="w-full rounded-2xl border border-white/60 bg-white/80 px-4 py-3 text-vision-ink outline-none focus:border-plasma-blue/40"
+          className="glass-input"
           value={passwords.confirm}
           onChange={(event) => setPasswords((prev) => ({ ...prev, confirm: event.target.value }))}
           disabled={status !== 'ready'}
+          placeholder="Repite tu contraseña"
+          required
+          aria-label="Confirmar contraseña"
         />
       </label>
       {message && <p className="text-xs text-soft-slate">{message}</p>}

@@ -106,9 +106,17 @@ body {
     @apply bg-soft-slate/50;
   }
 
-  /* Focus styles */
+  /* Focus styles - enhanced visibility */
   *:focus-visible {
-    @apply outline-none ring-2 ring-plasma-blue/30 ring-offset-2 ring-offset-white/50;
+    @apply outline-none ring-2 ring-plasma-blue/50 ring-offset-2 ring-offset-white/80;
+  }
+
+  /* Stronger focus ring for inputs */
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
+  button:focus-visible {
+    @apply outline-none ring-2 ring-plasma-blue/60 ring-offset-2 ring-offset-white;
   }
 }
 
@@ -169,6 +177,8 @@ body {
     @apply placeholder:text-soft-slate/60;
     @apply focus:border-plasma-blue/40 focus:bg-white/90;
     @apply focus:shadow-glow-sm focus:outline-none;
+    @apply focus-visible:ring-2 focus-visible:ring-plasma-blue/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-white/40;
   }
 
   .glass-input-lg {

@@ -4,8 +4,11 @@ import { KPI_VIEWS } from '@/utils/constants'
 import { KPI_ICON_MAP } from '@/components/kpi/iconMap'
 import { useAuthStore } from '@/store/auth'
 import { usePermissionsStore } from '@/store/permissions'
+import { useProgressStore } from '@/store/progress'
 import { Button } from '@/components/base/Button'
 import { cn } from '@/utils/ui'
+
+import type { KpiViewId } from '@/types/kpi'
 
 const navBase = [
   { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard, viewId: 'dashboard' as const },
@@ -22,10 +25,24 @@ export const Sidebar = ({ onNavigate }: SidebarProps) => {
   const canAccess = usePermissionsStore((state) => state.canAccess)
   const permissions = usePermissionsStore((state) => state.permissions)
   const loadingPermissions = usePermissionsStore((state) => state.loading)
+  const progressEntries = useProgressStore((state) => state.entries)
 
   const visibleNavLinks = navBase.filter((link) => canAccess(link.viewId))
   const visibleKpis = KPI_VIEWS.filter((view) => canAccess(view.id))
   const enabledCount = Object.values(permissions).filter(Boolean).length
+
+  // Helper para obtener color de estado
+  const getStatusColor = (viewId: KpiViewId) => {
+    const status = progressEntries[viewId]?.status
+    switch (status) {
+      case 'complete':
+        return 'bg-emerald-500'
+      case 'in_progress':
+        return 'bg-amber-500'
+      default:
+        return 'bg-slate-300'
+    }
+  }
 
   const handleNavClick = () => {
     onNavigate?.()
@@ -124,7 +141,12 @@ export const Sidebar = ({ onNavigate }: SidebarProps) => {
                     <Icon className="size-4" />
                   </span>
                 )}
-                <span className="truncate">{view.name}</span>
+                <span className="truncate flex-1">{view.name}</span>
+                {/* Estado del KPI */}
+                <span 
+                  className={cn('w-2 h-2 rounded-full shrink-0', getStatusColor(view.id))}
+                  aria-label={progressEntries[view.id]?.status === 'complete' ? 'Completado' : progressEntries[view.id]?.status === 'in_progress' ? 'En progreso' : 'Sin iniciar'}
+                />
               </NavLink>
             )
           })}

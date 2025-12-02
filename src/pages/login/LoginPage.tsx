@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Link, useNavigate } from 'react-router-dom'
-import { Mail, Lock, ArrowRight } from 'lucide-react'
+import { Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/base/Button'
 import { useAuthStore } from '@/store/auth'
 
@@ -11,6 +11,7 @@ export const LoginPage = () => {
   const [form, setForm] = useState({ email: '', password: '' })
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -32,15 +33,17 @@ export const LoginPage = () => {
         <label className="block space-y-2">
           <span className="text-sm font-medium text-vision-ink flex items-center gap-2">
             <Mail className="size-4 text-soft-slate" />
-            Email corporativo
+            Email
           </span>
           <input
             className="glass-input"
             type="email"
             value={form.email}
             onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
-            placeholder="tu@empresa.com"
+            placeholder="tu@email.com"
             required
+            disabled={loading}
+            aria-label="Correo electrónico"
           />
         </label>
         
@@ -49,14 +52,26 @@ export const LoginPage = () => {
             <Lock className="size-4 text-soft-slate" />
             Contraseña
           </span>
-          <input
-            className="glass-input"
-            type="password"
-            value={form.password}
-            onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
-            placeholder="••••••••"
-            required
-          />
+          <div className="relative">
+            <input
+              className="glass-input pr-12"
+              type={showPassword ? 'text' : 'password'}
+              value={form.password}
+              onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
+              placeholder="••••••••"
+              required
+              disabled={loading}
+              aria-label="Contraseña"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-soft-slate hover:text-vision-ink hover:bg-white/50 transition-colors focus:outline-none focus:ring-2 focus:ring-plasma-blue/50"
+              aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+            >
+              {showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
+            </button>
+          </div>
         </label>
       </div>
 

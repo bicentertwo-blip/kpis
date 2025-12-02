@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { usePermissionsStore } from '@/store/permissions'
 import { PERMISSION_VIEWS, ALL_VIEW_IDS } from '@/utils/constants'
 import type { AppViewId } from '@/types/views'
+import { Search } from 'lucide-react'
 
 const coreViews = PERMISSION_VIEWS.filter((view) => view.category === 'core')
 const kpiViews = PERMISSION_VIEWS.filter((view) => view.category === 'kpi')
@@ -9,10 +10,18 @@ const kpiViews = PERMISSION_VIEWS.filter((view) => view.category === 'kpi')
 export const ConfiguracionPage = () => {
   const { assignments, fetchAssignments, toggleView, setAllViewsForUser, setAllViewsForAllUsers, adminLoading } = usePermissionsStore()
   const [globalLoading, setGlobalLoading] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
     void fetchAssignments()
   }, [fetchAssignments])
+
+  // Filtrar usuarios por email
+  const filteredAssignments = useMemo(() => {
+    if (!searchQuery.trim()) return assignments
+    const query = searchQuery.toLowerCase()
+    return assignments.filter((a) => a.email.toLowerCase().includes(query))
+  }, [assignments, searchQuery])
 
   const handleActivateAllForUser = async (userId: string) => {
     await setAllViewsForUser(userId, ALL_VIEW_IDS as AppViewId[])
@@ -40,6 +49,26 @@ export const ConfiguracionPage = () => {
 
   return (
     <div className="space-y-6">
+      {/* Búsqueda de usuarios */}
+      <div className="glass-panel rounded-3xl p-4 sm:p-6">
+        <div className="relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-soft-slate pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Buscar usuario por email..."
+            className="glass-input pl-12 w-full"
+            aria-label="Buscar usuario por email"
+          />
+        </div>
+        {searchQuery && (
+          <p className="text-xs text-soft-slate mt-2">
+            {filteredAssignments.length} de {assignments.length} usuarios
+          </p>
+        )}
+      </div>
+
       {/* Controles globales */}
       <div className="glass-panel rounded-3xl p-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -69,7 +98,13 @@ export const ConfiguracionPage = () => {
       </div>
 
       {/* Lista de usuarios */}
-      {assignments.map((assignment) => {
+      {filteredAssignments.length === 0 && searchQuery && (
+        <div className="glass-panel rounded-3xl p-6 text-center">
+          <p className="text-sm text-soft-slate">No se encontraron usuarios con "{searchQuery}"</p>
+        </div>
+      )}
+
+      {filteredAssignments.map((assignment) => {
         const allEnabled = ALL_VIEW_IDS.every((id) => assignment.permitted_views?.includes(id))
         const noneEnabled = !assignment.permitted_views?.length
 
