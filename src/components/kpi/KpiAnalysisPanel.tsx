@@ -84,19 +84,34 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
       setLoading(true)
 
       try {
-        // Cargar datos de resumen (todos los usuarios pueden ver todos los datos)
+        // Cargar datos de resumen - solo el más reciente por mes
         if (resumenTable) {
           const { data: resumen } = await supabase
             .from(resumenTable)
             .select('*')
             .eq('anio', selectedYear)
             .order('mes', { ascending: true })
+            .order('updated_at', { ascending: false })
 
-          if (resumen) {
-            setResumenData(resumen.map((r: Record<string, unknown>) => ({
-              ...r,
-              periodo: `${MONTHS_SHORT[(r.mes as number) - 1]} ${r.anio}`,
-            })) as DataPoint[])
+          if (resumen && resumen.length > 0) {
+            // Filtrar para quedarnos solo con el más reciente por mes
+            const latestByMonth = (resumen as Record<string, unknown>[]).reduce((acc: Record<number, Record<string, unknown>>, curr) => {
+              const mes = curr.mes as number
+              // Si no existe o el actual es más reciente, lo guardamos
+              if (!acc[mes] || new Date(curr.updated_at as string) > new Date(acc[mes].updated_at as string)) {
+                acc[mes] = curr
+              }
+              return acc
+            }, {})
+
+            setResumenData(Object.values(latestByMonth)
+              .sort((a, b) => (a.mes as number) - (b.mes as number))
+              .map((r) => ({
+                ...r,
+                periodo: `${MONTHS_SHORT[(r.mes as number) - 1]} ${r.anio}`,
+              })) as DataPoint[])
+          } else {
+            setResumenData([])
           }
         }
 
