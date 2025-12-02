@@ -2,9 +2,10 @@
  * Panel de Análisis para KPIs
  * Visualización de datos históricos con gráficas interactivas
  * Optimizado para móviles (iPhone-first)
+ * Soporta múltiples secciones de resumen y detalle
  */
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   AreaChart,
@@ -32,6 +33,8 @@ import {
   Sparkles,
   RefreshCw,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import type { KpiDefinition } from '@/types/kpi-definitions'
 import { supabase } from '@/lib/supabase'
@@ -56,7 +59,15 @@ interface DataPoint {
   [key: string]: string | number
 }
 
-// Colores para gráficas - eslint-disable-next-line
+interface SectionData {
+  id: string
+  title: string
+  tableName: string
+  data: DataPoint[]
+  lastUploadInfo?: { date: string; count: number } | null
+}
+
+// Colores para gráficas
 const PIE_COLORS = ['#4F46E5', '#06B6D4', '#8B5CF6', '#F59E0B', '#10B981', '#EF4444', '#EC4899', '#6366F1']
 
 const MONTHS_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
@@ -65,75 +76,99 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
   const [activeView, setActiveView] = useState<AnalysisView>('resumen')
   const [chartType, setChartType] = useState<ChartType>('area')
   const [loading, setLoading] = useState(true)
-  const [resumenData, setResumenData] = useState<DataPoint[]>([])
-  const [detalleData, setDetalleData] = useState<DataPoint[]>([])
+  const [resumenSections, setResumenSections] = useState<SectionData[]>([])
+  const [detalleSections, setDetalleSections] = useState<SectionData[]>([])
+  const [activeResumenIndex, setActiveResumenIndex] = useState(0)
+  const [activeDetalleIndex, setActiveDetalleIndex] = useState(0)
   const [selectedYear, setSelectedYear] = useState(filters?.anio || new Date().getFullYear())
   const [showYearFilter, setShowYearFilter] = useState(false)
-  const [lastUploadInfo, setLastUploadInfo] = useState<{ date: string; count: number } | null>(null)
   
   const userId = useAuthStore((state) => state.session?.user.id)
 
-  // Obtener tablas del config
-  const resumenTable = config.summaries[0]?.tableName
-  const detalleTable = config.details[0]?.tableName
+  // Obtener la sección activa según la vista
+  const activeSections = activeView === 'resumen' ? resumenSections : detalleSections
+  const activeIndex = activeView === 'resumen' ? activeResumenIndex : activeDetalleIndex
+  const setActiveIndex = activeView === 'resumen' ? setActiveResumenIndex : setActiveDetalleIndex
+  const currentSection = activeSections[activeIndex]
 
-  // Cargar datos
+  // Navegar entre secciones
+  const goToNextSection = useCallback(() => {
+    if (activeIndex < activeSections.length - 1) {
+      setActiveIndex(activeIndex + 1)
+    }
+  }, [activeIndex, activeSections.length, setActiveIndex])
+
+  const goToPrevSection = useCallback(() => {
+    if (activeIndex > 0) {
+      setActiveIndex(activeIndex - 1)
+    }
+  }, [activeIndex, setActiveIndex])
+
+  // Cargar datos de todas las secciones
   useEffect(() => {
     const fetchData = async () => {
       if (!userId) return
       setLoading(true)
 
       try {
-        // Cargar datos de resumen - solo el más reciente por mes
-        if (resumenTable) {
+        // Cargar datos de TODAS las tablas de resumen
+        const resumenPromises = config.summaries.map(async (summary) => {
           const { data: resumen } = await supabase
-            .from(resumenTable)
+            .from(summary.tableName)
             .select('*')
             .eq('anio', selectedYear)
             .order('mes', { ascending: true })
             .order('updated_at', { ascending: false })
 
+          let processedData: DataPoint[] = []
+
           if (resumen && resumen.length > 0) {
             // Filtrar para quedarnos solo con el más reciente por mes
             const latestByMonth = (resumen as Record<string, unknown>[]).reduce((acc: Record<number, Record<string, unknown>>, curr) => {
               const mes = curr.mes as number
-              // Si no existe o el actual es más reciente, lo guardamos
               if (!acc[mes] || new Date(curr.updated_at as string) > new Date(acc[mes].updated_at as string)) {
                 acc[mes] = curr
               }
               return acc
             }, {})
 
-            setResumenData(Object.values(latestByMonth)
+            processedData = Object.values(latestByMonth)
               .sort((a, b) => (a.mes as number) - (b.mes as number))
               .map((r) => ({
                 ...r,
                 periodo: `${MONTHS_SHORT[(r.mes as number) - 1]} ${r.anio}`,
-              })) as DataPoint[])
-          } else {
-            setResumenData([])
+              })) as DataPoint[]
           }
-        }
 
-        // Cargar datos de detalle - mostrar la última carga
-        if (detalleTable) {
+          return {
+            id: summary.id,
+            title: summary.title,
+            tableName: summary.tableName,
+            data: processedData,
+          }
+        })
+
+        // Cargar datos de TODAS las tablas de detalle
+        const detallePromises = config.details.map(async (detail) => {
           // Primero obtener la fecha de la última carga
           const { data: lastRecord } = await supabase
-            .from(detalleTable)
+            .from(detail.tableName)
             .select('created_at')
             .eq('anio', selectedYear)
             .order('created_at', { ascending: false })
             .limit(1)
             .single()
 
+          let processedData: DataPoint[] = []
+          let lastUploadInfo: { date: string; count: number } | null = null
+
           if (lastRecord) {
             const lastUploadDate = new Date(lastRecord.created_at as string)
-            // Buscar todos los registros de esa carga (mismo timestamp +/- 1 minuto)
             const startTime = new Date(lastUploadDate.getTime() - 60000).toISOString()
             const endTime = new Date(lastUploadDate.getTime() + 60000).toISOString()
 
             const { data: detalle } = await supabase
-              .from(detalleTable)
+              .from(detail.tableName)
               .select('*')
               .eq('anio', selectedYear)
               .gte('created_at', startTime)
@@ -141,8 +176,7 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
               .order('mes', { ascending: true })
 
             if (detalle && detalle.length > 0) {
-              // Guardar info de la última carga
-              setLastUploadInfo({
+              lastUploadInfo = {
                 date: lastUploadDate.toLocaleDateString('es-MX', { 
                   day: 'numeric', 
                   month: 'short', 
@@ -151,9 +185,9 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
                   minute: '2-digit'
                 }),
                 count: detalle.length
-              })
+              }
 
-              // Agrupar por mes para el detalle
+              // Agrupar por mes
               const grouped = (detalle as Record<string, unknown>[]).reduce((acc: Record<number, DataPoint>, curr) => {
                 const mes = curr.mes as number
                 if (!acc[mes]) {
@@ -165,7 +199,6 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
                   }
                 }
                 acc[mes].count = (acc[mes].count as number) + 1
-                // Sumar valores numéricos
                 Object.keys(curr).forEach((key) => {
                   if (typeof curr[key] === 'number' && !['mes', 'anio'].includes(key)) {
                     acc[mes][key] = ((acc[mes][key] as number) || 0) + (curr[key] as number)
@@ -173,16 +206,35 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
                 })
                 return acc
               }, {})
-              setDetalleData(Object.values(grouped))
-            } else {
-              setDetalleData([])
-              setLastUploadInfo(null)
+              processedData = Object.values(grouped)
             }
-          } else {
-            setDetalleData([])
-            setLastUploadInfo(null)
           }
+
+          return {
+            id: detail.id,
+            title: detail.title,
+            tableName: detail.tableName,
+            data: processedData,
+            lastUploadInfo,
+          }
+        })
+
+        const [resumenResults, detalleResults] = await Promise.all([
+          Promise.all(resumenPromises),
+          Promise.all(detallePromises)
+        ])
+
+        setResumenSections(resumenResults)
+        setDetalleSections(detalleResults)
+
+        // Reset index si excede el nuevo número de secciones
+        if (activeResumenIndex >= resumenResults.length) {
+          setActiveResumenIndex(0)
         }
+        if (activeDetalleIndex >= detalleResults.length) {
+          setActiveDetalleIndex(0)
+        }
+
       } catch (error) {
         console.error('Error cargando datos de análisis:', error)
       } finally {
@@ -191,14 +243,16 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
     }
 
     fetchData()
-  }, [userId, resumenTable, detalleTable, selectedYear])
+  }, [userId, config.summaries, config.details, selectedYear, activeResumenIndex, activeDetalleIndex])
+
+  // Datos actuales para la gráfica
+  const chartData = currentSection?.data || []
 
   // Calcular métricas
   const metrics = useMemo(() => {
-    const data = activeView === 'resumen' ? resumenData : detalleData
-    if (data.length === 0) return null
+    if (!currentSection || currentSection.data.length === 0) return null
 
-    // Encontrar el campo numérico principal
+    const data = currentSection.data
     const numericFields = Object.keys(data[0] || {}).filter(
       (k) => typeof data[0][k] === 'number' && !['mes', 'anio', 'count'].includes(k)
     )
@@ -225,15 +279,14 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
       min,
       trend: change > 0 ? 'up' : change < 0 ? 'down' : 'neutral',
     }
-  }, [activeView, resumenData, detalleData])
+  }, [currentSection])
 
-  // Obtener datos para gráficas
-  const chartData = activeView === 'resumen' ? resumenData : detalleData
+  // Obtener keys para gráficas
   const dataKeys = useMemo(() => {
     if (chartData.length === 0) return []
     return Object.keys(chartData[0] || {}).filter(
       (k) => typeof chartData[0][k] === 'number' && !['mes', 'anio'].includes(k)
-    ).slice(0, 3) // Máximo 3 series
+    ).slice(0, 3)
   }, [chartData])
 
   // Formato de números
@@ -401,6 +454,11 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
           >
             <Sparkles className="size-4" />
             <span>Resumido</span>
+            {resumenSections.length > 1 && (
+              <span className="ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-white/20">
+                {resumenSections.length}
+              </span>
+            )}
           </button>
           <button
             onClick={() => setActiveView('detalle')}
@@ -414,6 +472,11 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
           >
             <Layers className="size-4" />
             <span>Detallado</span>
+            {detalleSections.length > 1 && (
+              <span className="ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-white/20">
+                {detalleSections.length}
+              </span>
+            )}
           </button>
         </div>
 
@@ -483,6 +546,70 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
           </div>
         </div>
       </div>
+
+      {/* Navegador de Secciones (solo si hay más de 1) */}
+      {activeSections.length > 1 && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass-panel rounded-2xl p-3 border border-plasma-blue/20 bg-gradient-to-r from-plasma-blue/5 via-transparent to-plasma-indigo/5"
+        >
+          <div className="flex items-center justify-between">
+            {/* Botón anterior */}
+            <button
+              onClick={goToPrevSection}
+              disabled={activeIndex === 0}
+              className={cn(
+                'p-2 rounded-xl transition-all',
+                activeIndex === 0
+                  ? 'opacity-30 cursor-not-allowed'
+                  : 'hover:bg-white/50 text-plasma-blue'
+              )}
+            >
+              <ChevronLeft className="size-5" />
+            </button>
+
+            {/* Indicadores de sección */}
+            <div className="flex-1 mx-4">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                {activeSections.map((section, idx) => (
+                  <button
+                    key={section.id}
+                    onClick={() => setActiveIndex(idx)}
+                    className={cn(
+                      'w-2.5 h-2.5 rounded-full transition-all duration-300',
+                      idx === activeIndex
+                        ? 'bg-gradient-to-r from-plasma-blue to-plasma-indigo scale-125'
+                        : 'bg-soft-slate/30 hover:bg-soft-slate/50'
+                    )}
+                    aria-label={`Ir a ${section.title}`}
+                  />
+                ))}
+              </div>
+              <p className="text-center text-sm font-semibold text-vision-ink truncate">
+                {currentSection?.title || 'Cargando...'}
+              </p>
+              <p className="text-center text-xs text-soft-slate mt-0.5">
+                Sección {activeIndex + 1} de {activeSections.length}
+              </p>
+            </div>
+
+            {/* Botón siguiente */}
+            <button
+              onClick={goToNextSection}
+              disabled={activeIndex === activeSections.length - 1}
+              className={cn(
+                'p-2 rounded-xl transition-all',
+                activeIndex === activeSections.length - 1
+                  ? 'opacity-30 cursor-not-allowed'
+                  : 'hover:bg-white/50 text-plasma-blue'
+              )}
+            >
+              <ChevronRight className="size-5" />
+            </button>
+          </div>
+        </motion.div>
+      )}
 
       {/* Métricas rápidas */}
       <AnimatePresence mode="wait">
@@ -577,17 +704,17 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-sm font-semibold text-vision-ink">
-              {activeView === 'resumen' ? 'Tendencia de Resumen' : 'Tendencia de Detalle'}
+              {currentSection?.title || (activeView === 'resumen' ? 'Tendencia de Resumen' : 'Tendencia de Detalle')}
             </h3>
             <p className="text-xs text-soft-slate mt-0.5">
               Evolución mensual • {selectedYear}
             </p>
             {/* Info de última carga para detalles */}
-            {activeView === 'detalle' && lastUploadInfo && (
+            {activeView === 'detalle' && currentSection?.lastUploadInfo && (
               <div className="flex items-center gap-2 mt-2 px-2 py-1 bg-plasma-blue/5 rounded-lg border border-plasma-blue/20">
                 <div className="w-2 h-2 rounded-full bg-plasma-blue animate-pulse" />
                 <span className="text-xs text-plasma-blue font-medium">
-                  Última carga: {lastUploadInfo.date} • {lastUploadInfo.count} registros
+                  Última carga: {currentSection.lastUploadInfo.date} • {currentSection.lastUploadInfo.count} registros
                 </span>
               </div>
             )}
@@ -600,7 +727,7 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
 
         <AnimatePresence mode="wait">
           <motion.div
-            key={`${activeView}-${chartType}-${selectedYear}`}
+            key={`${activeView}-${chartType}-${selectedYear}-${activeIndex}`}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
