@@ -1,6 +1,6 @@
-# Manual de Implementación: Sistema de Autenticación KPIs VisionOS
+# Manual de Implementación: Sistema de Autenticación KPIs - Inteligencia de Negocios
 
-Este documento describe el flujo completo de autenticación e invitación de usuarios para la aplicación KPIs VisionOS, incluyendo la configuración necesaria en Supabase y el código del frontend.
+Este documento describe el flujo completo de autenticación e invitación de usuarios para la aplicación KPIs - Inteligencia de Negocios, incluyendo la configuración necesaria en Supabase y el código del frontend.
 
 ---
 
@@ -187,7 +187,7 @@ Ve a **Authentication** → **Email Templates** en el dashboard de Supabase.
 
 ```html
 <h2 style="font-family:sans-serif;font-size:22px;font-weight:600;margin-bottom:16px;">
-  Te invitaron a KPIs VisionOS
+  Te invitaron a KPIs - Inteligencia de Negocios
 </h2>
 
 <p style="font-family:sans-serif;font-size:16px;color:#475569;margin:0 0 20px;">

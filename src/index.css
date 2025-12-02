@@ -15,6 +15,53 @@ html {
   scroll-behavior: smooth;
 }
 
+/* =====================================================
+   iOS / Safari Performance Optimizations
+   ===================================================== */
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* iOS-specific fixes */
+@supports (-webkit-touch-callout: none) {
+  /* Force GPU acceleration on iOS */
+  .glass-panel,
+  .glass-card,
+  .glass-input {
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    -webkit-perspective: 1000px;
+    perspective: 1000px;
+  }
+
+  /* Reduce backdrop-blur intensity on iOS for better performance */
+  .backdrop-blur-xl {
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+  }
+
+  .backdrop-blur-2xl {
+    -webkit-backdrop-filter: blur(24px);
+    backdrop-filter: blur(24px);
+  }
+
+  .backdrop-blur-3xl {
+    -webkit-backdrop-filter: blur(32px);
+    backdrop-filter: blur(32px);
+  }
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -73,6 +120,12 @@ body {
     @apply shadow-glass;
     @apply rounded-3xl;
     @apply transition-all duration-300 ease-smooth;
+    /* iOS performance: force hardware acceleration */
+    -webkit-transform: translate3d(0, 0, 0);
+    transform: translate3d(0, 0, 0);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    will-change: transform, opacity;
   }
 
   .glass-panel::before {
@@ -80,6 +133,9 @@ body {
     @apply absolute inset-0 pointer-events-none;
     @apply bg-gradient-to-br from-white/40 via-transparent to-white/10;
     @apply rounded-[inherit];
+    /* Prevent flickering on iOS */
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
   }
 
   .glass-panel-hover {
@@ -87,6 +143,9 @@ body {
     @apply hover:shadow-glass-hover hover:border-white/80;
     @apply hover:bg-white/80;
     @apply hover:-translate-y-0.5;
+    /* Smoother transitions on touch devices */
+    @apply active:translate-y-0 active:scale-[0.99];
+    -webkit-tap-highlight-color: transparent;
   }
 
   .glass-card {
@@ -172,5 +231,32 @@ body {
 
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
+  }
+
+  /* GPU-accelerated utilities for iOS */
+  .gpu-accelerated {
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+  }
+
+  /* Prevent iOS text size adjustment */
+  .ios-text-fix {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  /* Remove iOS input styling */
+  .ios-input-fix {
+    -webkit-appearance: none;
+    appearance: none;
+    border-radius: 0;
+  }
+
+  /* Smooth scrolling container for iOS */
+  .ios-scroll {
+    -webkit-overflow-scrolling: touch;
+    overflow-scrolling: touch;
   }
 }

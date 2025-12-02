@@ -56,23 +56,42 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <motion.div
         whileHover={{ scale: disabled || loading ? 1 : 1.02 }}
-        whileTap={{ scale: disabled || loading ? 1 : 0.98 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+        whileTap={{ scale: disabled || loading ? 1 : 0.97 }}
+        transition={{ 
+          type: 'spring', 
+          stiffness: 500, 
+          damping: 25,
+          // Faster response for iOS
+          mass: 0.5,
+        }}
         className={cn(fullWidth ? 'w-full' : 'inline-block')}
+        style={{
+          // iOS GPU acceleration
+          WebkitTransform: 'translateZ(0)',
+          transform: 'translateZ(0)',
+          WebkitBackfaceVisibility: 'hidden',
+          backfaceVisibility: 'hidden',
+        }}
       >
         <button
           ref={ref}
           className={cn(
             'relative inline-flex items-center justify-center w-full',
             'rounded-full font-medium',
-            'transition-all duration-300 ease-smooth',
+            'transition-all duration-200 ease-smooth', // Faster transition
             'disabled:opacity-50 disabled:cursor-not-allowed',
             'focus-visible:ring-2 focus-visible:ring-plasma-blue/40 focus-visible:ring-offset-2',
+            // iOS tap highlight removal
+            'touch-manipulation',
             variants[variant],
             sizes[size],
             glow && 'drop-shadow-glow',
             className
           )}
+          style={{
+            WebkitTapHighlightColor: 'transparent',
+            WebkitTransform: 'translateZ(0)',
+          }}
           disabled={disabled || loading}
           {...props}
         >
@@ -85,9 +104,12 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           {iconRight && !loading && (
             <span className={cn(iconSizes[size], 'flex-shrink-0')}>{iconRight}</span>
           )}
-          {/* Shine effect */}
+          {/* Shine effect - disabled on touch devices for performance */}
           {variant === 'primary' && (
-            <span className="absolute inset-0 rounded-full bg-gradient-to-r from-white/0 via-white/20 to-white/0 opacity-0 hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+            <span 
+              className="absolute inset-0 rounded-full bg-gradient-to-r from-white/0 via-white/20 to-white/0 opacity-0 hover:opacity-100 transition-opacity duration-300 pointer-events-none hidden sm:block" 
+              aria-hidden="true"
+            />
           )}
         </button>
       </motion.div>

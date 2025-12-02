@@ -1,6 +1,5 @@
 import { Outlet } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Sparkles } from 'lucide-react'
 
 export const AuthLayout = () => (
   <div className="min-h-[100dvh] flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-hidden">
@@ -18,8 +17,13 @@ export const AuthLayout = () => (
       transition={{ duration: 0.6, ease: [0.25, 0.1, 0, 1] }}
       className="relative mb-6 sm:mb-8"
     >
-      <div className="flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-gradient-to-br from-plasma-blue via-plasma-indigo to-plasma-violet shadow-glow">
-        <Sparkles className="size-8 sm:size-10 text-white" />
+      <div className="flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-white/80 shadow-glow overflow-hidden p-2">
+        <img 
+          src="/logo.png" 
+          alt="Logo Inteligencia de Negocios" 
+          className="max-w-full max-h-full object-contain"
+          style={{ aspectRatio: 'auto' }}
+        />
       </div>
       {/* Glow effect */}
       <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-plasma-blue to-plasma-violet blur-xl opacity-40 -z-10 animate-pulse-soft" />
@@ -41,31 +45,37 @@ export const AuthLayout = () => (
         <div className="absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/60 via-transparent to-white/20 pointer-events-none" />
         
         {/* Header */}
-        <div className="relative space-y-2 text-center mb-6 sm:mb-8">
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            className="text-[10px] sm:text-xs uppercase tracking-[0.4em] text-plasma-blue font-medium"
-          >
-            KPIs VisionOS
-          </motion.p>
-          <motion.h1
+        <div className="relative space-y-1 text-center mb-6 sm:mb-8">
+          <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="text-2xl sm:text-3xl lg:text-4xl font-semibold text-vision-ink"
+            transition={{ delay: 0.3 }}
+            className="flex flex-col items-center gap-0"
           >
-            Bienvenido
-          </motion.h1>
-          <motion.p
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold bg-gradient-to-r from-vision-ink via-plasma-blue to-plasma-indigo bg-clip-text text-transparent tracking-tight">
+              KPIs
+            </h1>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="h-px w-8 bg-gradient-to-r from-transparent to-plasma-blue/40" />
+              <p className="text-[10px] sm:text-xs uppercase tracking-[0.3em] text-plasma-blue font-semibold">
+                Inteligencia de Negocios
+              </p>
+              <span className="h-px w-8 bg-gradient-to-l from-transparent to-plasma-blue/40" />
+            </div>
+          </motion.div>
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-            className="text-sm sm:text-base text-soft-slate max-w-xs mx-auto"
+            transition={{ delay: 0.4 }}
+            className="pt-4"
           >
-            Accede para continuar con la captura de indicadores
-          </motion.p>
+            <p className="text-xl sm:text-2xl font-semibold text-vision-ink">
+              Bienvenido
+            </p>
+            <p className="text-sm sm:text-base text-soft-slate max-w-xs mx-auto mt-1">
+              Accede para continuar con la captura de indicadores
+            </p>
+          </motion.div>
         </div>
 
         {/* Form content */}
@@ -87,7 +97,7 @@ export const AuthLayout = () => (
       transition={{ delay: 0.8 }}
       className="mt-6 sm:mt-8 text-xs text-soft-slate/60 text-center"
     >
-      © 2025 KPIs VisionOS. Todos los derechos reservados.
+      © 2025 KPIs - Inteligencia de Negocios. Todos los derechos reservados.
     </motion.p>
   </div>
 )

@@ -1,6 +1,6 @@
 /**
  * Formulario de resumen para KPIs
- * Componente reutilizable con validación y estilo VisionOS
+ * Componente reutilizable con validación y estilo Glass Design
  * MODO MANUAL: Botón para guardar e insertar en la base de datos
  */
 

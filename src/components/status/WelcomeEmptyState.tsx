@@ -58,7 +58,7 @@ export const WelcomeEmptyState = ({ viewId, customMessage }: WelcomeEmptyStatePr
               transition={{ delay: 0.4 }}
               className="text-xl sm:text-2xl lg:text-3xl font-semibold text-vision-ink mb-3 text-balance"
             >
-              {viewName ? `Aún no tienes acceso a ${viewName}` : 'Experiencia VisionOS'}
+              {viewName ? `Aún no tienes acceso a ${viewName}` : 'Inteligencia de Negocios'}
             </motion.h2>
             
             <motion.p

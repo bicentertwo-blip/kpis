@@ -1,5 +1,4 @@
 import { motion } from 'framer-motion'
-import { Sparkles } from 'lucide-react'
 
 export const FullScreenLoader = () => (
   <div className="fixed inset-0 grid place-items-center bg-gradient-to-br from-white via-vision-glow to-white">
@@ -28,8 +27,13 @@ export const FullScreenLoader = () => (
         transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
         className="relative"
       >
-        <div className="flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-br from-plasma-blue via-plasma-indigo to-plasma-violet shadow-glow">
-          <Sparkles className="size-10 text-white" />
+        <div className="flex items-center justify-center w-20 h-20 rounded-3xl bg-white/80 shadow-glow overflow-hidden p-2">
+          <img 
+            src="/logo.png" 
+            alt="Logo Inteligencia de Negocios" 
+            className="max-w-full max-h-full object-contain"
+            style={{ aspectRatio: 'auto' }}
+          />
         </div>
         <motion.div
           animate={{ scale: [1, 1.5, 1], opacity: [0.5, 0, 0.5] }}
@@ -40,22 +44,27 @@ export const FullScreenLoader = () => (
 
       {/* Loading text */}
       <div className="text-center">
-        <motion.p
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
-          className="text-[10px] uppercase tracking-[0.4em] text-plasma-blue font-medium mb-2"
+          className="flex flex-col items-center gap-0"
         >
-          KPIs VisionOS
-        </motion.p>
-        <motion.h2
+          <h1 className="text-3xl font-extrabold bg-gradient-to-r from-vision-ink via-plasma-blue to-plasma-indigo bg-clip-text text-transparent tracking-tight">
+            KPIs
+          </h1>
+          <p className="text-[9px] uppercase tracking-[0.25em] text-plasma-blue font-semibold mt-0.5">
+            Inteligencia de Negocios
+          </p>
+        </motion.div>
+        <motion.p
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="text-xl font-semibold text-vision-ink"
+          className="text-lg font-medium text-vision-ink mt-4"
         >
           Preparando tu espacio
-        </motion.h2>
+        </motion.p>
       </div>
 
       {/* Loading dots */}
