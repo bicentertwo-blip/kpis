@@ -2,7 +2,8 @@ import { useEffect, useState, useMemo } from 'react'
 import { usePermissionsStore } from '@/store/permissions'
 import { PERMISSION_VIEWS, ALL_VIEW_IDS } from '@/utils/constants'
 import type { AppViewId } from '@/types/views'
-import { Search } from 'lucide-react'
+import { Search, Database, Sparkles } from 'lucide-react'
+import { DatabaseCleanupModal } from '@/components/admin/DatabaseCleanupModal'
 
 const coreViews = PERMISSION_VIEWS.filter((view) => view.category === 'core')
 const kpiViews = PERMISSION_VIEWS.filter((view) => view.category === 'kpi')
@@ -11,6 +12,7 @@ export const ConfiguracionPage = () => {
   const { assignments, fetchAssignments, toggleView, setAllViewsForUser, setAllViewsForAllUsers, adminLoading } = usePermissionsStore()
   const [globalLoading, setGlobalLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [cleanupModalOpen, setCleanupModalOpen] = useState(false)
 
   useEffect(() => {
     void fetchAssignments()
@@ -49,6 +51,44 @@ export const ConfiguracionPage = () => {
 
   return (
     <div className="space-y-6">
+      {/* Panel de Mantenimiento de Base de Datos */}
+      <div className="glass-panel rounded-3xl p-6 bg-gradient-to-r from-plasma-blue/5 via-transparent to-purple-500/5 border border-plasma-blue/20">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-plasma-blue to-purple-500 rounded-2xl blur-lg opacity-30 animate-pulse" />
+              <div className="relative p-3 bg-gradient-to-br from-plasma-blue to-purple-500 rounded-2xl">
+                <Database className="size-6 text-white" />
+              </div>
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold text-vision-ink">Mantenimiento de Base de Datos</p>
+                <Sparkles className="size-4 text-plasma-blue" />
+              </div>
+              <p className="text-xs text-soft-slate">Limpia registros obsoletos y optimiza el rendimiento.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setCleanupModalOpen(true)}
+            className="group relative overflow-hidden rounded-2xl bg-gradient-to-r from-plasma-blue to-purple-500 px-6 py-3 text-sm font-medium text-white shadow-lg shadow-plasma-blue/25 transition-all hover:shadow-xl hover:shadow-plasma-blue/30 hover:scale-105 active:scale-95"
+            type="button"
+          >
+            <span className="relative z-10 flex items-center gap-2">
+              <Database className="size-4" />
+              Abrir Panel de Limpieza
+            </span>
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-plasma-blue opacity-0 transition-opacity group-hover:opacity-100" />
+          </button>
+        </div>
+      </div>
+
+      {/* Modal de Limpieza */}
+      <DatabaseCleanupModal 
+        isOpen={cleanupModalOpen} 
+        onClose={() => setCleanupModalOpen(false)} 
+      />
+
       {/* Búsqueda de usuarios */}
       <div className="glass-panel rounded-3xl p-4 sm:p-6">
         <div className="relative">

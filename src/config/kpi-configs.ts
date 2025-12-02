@@ -58,22 +58,6 @@ const campoMetaPorcentaje: FieldDefinition = {
   required: true,
 }
 
-const campoEntidad: FieldDefinition = {
-  id: 'entidad',
-  label: 'Entidad',
-  type: 'text',
-  placeholder: 'Ej: SOFOM Principal',
-  required: true,
-}
-
-const campoPlaza: FieldDefinition = {
-  id: 'plaza',
-  label: 'Plaza',
-  type: 'text',
-  placeholder: 'Ej: CDMX Norte',
-  required: true,
-}
-
 // Nota: campoRegion se usa en configuraciones que requieren región
 const _campoRegion: FieldDefinition = {
   id: 'region',
@@ -251,12 +235,11 @@ export const COLOCACION_CONFIG: KpiDefinition = {
     {
       id: 'resumen-colocacion',
       title: '1. Monto de Colocación',
-      description: 'Colocación por entidad',
+      description: 'Monto total de colocación mensual',
       tableName: 'kpi_colocacion_resumen_1',
       fields: [
         campoAnio,
         campoMes,
-        campoEntidad,
         {
           id: 'monto_colocacion',
           label: 'Monto Colocación',
@@ -269,14 +252,12 @@ export const COLOCACION_CONFIG: KpiDefinition = {
     },
     {
       id: 'resumen-imor',
-      title: '2. IMOR por Plaza',
-      description: 'Índice de morosidad por plaza',
+      title: '2. IMOR',
+      description: 'Índice de morosidad mensual',
       tableName: 'kpi_colocacion_resumen_2',
       fields: [
         campoAnio,
         campoMes,
-        campoEntidad,
-        campoPlaza,
         {
           id: 'imor',
           label: 'IMOR (%)',
@@ -291,12 +272,11 @@ export const COLOCACION_CONFIG: KpiDefinition = {
     {
       id: 'resumen-crecimiento',
       title: '3. Crecimiento de Cartera',
-      description: 'Evolución de cartera por entidad',
+      description: 'Evolución de cartera mensual',
       tableName: 'kpi_colocacion_resumen_3',
       fields: [
         campoAnio,
         campoMes,
-        campoEntidad,
         {
           id: 'cartera_inicial',
           label: 'Cartera Inicial',
@@ -362,12 +342,11 @@ export const RENTABILIDAD_CONFIG: KpiDefinition = {
     {
       id: 'resumen-ebitda',
       title: '1. EBITDA',
-      description: 'EBITDA por entidad',
+      description: 'EBITDA mensual',
       tableName: 'kpi_rentabilidad_resumen_1',
       fields: [
         campoAnio,
         campoMes,
-        campoEntidad,
         {
           id: 'ebitda',
           label: 'EBITDA',
@@ -381,12 +360,11 @@ export const RENTABILIDAD_CONFIG: KpiDefinition = {
     {
       id: 'resumen-flujo-libre',
       title: '2. Flujo Libre',
-      description: 'Flujo de caja libre por entidad',
+      description: 'Flujo de caja libre mensual',
       tableName: 'kpi_rentabilidad_resumen_2',
       fields: [
         campoAnio,
         campoMes,
-        campoEntidad,
         {
           id: 'flujo_libre',
           label: 'Flujo Libre',
@@ -400,12 +378,11 @@ export const RENTABILIDAD_CONFIG: KpiDefinition = {
     {
       id: 'resumen-flujo-operativo',
       title: '3. Flujo Operativo',
-      description: 'Flujo operativo por entidad',
+      description: 'Flujo operativo mensual',
       tableName: 'kpi_rentabilidad_resumen_3',
       fields: [
         campoAnio,
         campoMes,
-        campoEntidad,
         {
           id: 'flujo_operativo',
           label: 'Flujo Operativo',
@@ -419,12 +396,11 @@ export const RENTABILIDAD_CONFIG: KpiDefinition = {
     {
       id: 'resumen-gasto-credito',
       title: '4. Gasto por Crédito',
-      description: 'Costo operativo por crédito',
+      description: 'Costo operativo por crédito mensual',
       tableName: 'kpi_rentabilidad_resumen_4',
       fields: [
         campoAnio,
         campoMes,
-        campoEntidad,
         {
           id: 'gasto_por_credito',
           label: 'Gasto por Crédito',
@@ -483,18 +459,11 @@ export const ROTACION_PERSONAL_CONFIG: KpiDefinition = {
     {
       id: 'resumen-rotacion',
       title: '1. Índice de Rotación',
-      description: 'Rotación por puesto',
+      description: 'Índice de rotación mensual',
       tableName: 'kpi_rotacion_resumen_1',
       fields: [
         campoAnio,
         campoMes,
-        {
-          id: 'puesto',
-          label: 'Puesto',
-          type: 'text',
-          placeholder: 'Ej: Asesor de Crédito',
-          required: true,
-        },
         {
           id: 'indice_rotacion',
           label: 'Índice de Rotación (%)',
@@ -856,25 +825,12 @@ export const SATISFACCION_CONFIG: KpiDefinition = {
   summaries: [
     {
       id: 'resumen-nps',
-      title: '1. NPS por Categoría',
-      description: 'NPS segmentado',
+      title: '1. NPS',
+      description: 'Net Promoter Score mensual',
       tableName: 'kpi_satisfaccion_resumen_1',
       fields: [
         campoAnio,
         campoMes,
-        {
-          id: 'categoria',
-          label: 'Categoría',
-          type: 'select',
-          required: true,
-          options: [
-            { value: 'producto', label: 'Producto' },
-            { value: 'servicio', label: 'Servicio' },
-            { value: 'atencion', label: 'Atención' },
-            { value: 'digital', label: 'Digital' },
-            { value: 'general', label: 'General' },
-          ],
-        },
         {
           id: 'nps',
           label: 'NPS',
