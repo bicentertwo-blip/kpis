@@ -108,7 +108,7 @@ export const MARGEN_FINANCIERO_CONFIG: KpiDefinition = {
       title: 'Detalle por Entidad/Plaza/Producto',
       description: 'Importar Excel con desagregación operativa del margen',
       tableName: 'kpi_margen_financiero_detalle',
-      columns: ['anio', 'mes', 'entidad', 'region', 'plaza', 'producto', 'concepto', 'valor', 'categoria', 'meta'],
+      columns: ['anio', 'mes', 'entidad', 'region', 'plaza', 'producto', 'ingresos', 'costo_financiero', 'margen_financiero', 'meta'],
     },
   ],
 }
@@ -215,7 +215,7 @@ export const ROE_ROA_CONFIG: KpiDefinition = {
       title: 'Detalle por Entidad',
       description: 'Importar Excel con datos por entidad',
       tableName: 'kpi_roe_roa_detalle',
-      columns: ['anio', 'mes', 'entidad', 'capital_contable', 'utilidad_operativa', 'utilidad_neta', 'activo_total'],
+      columns: ['anio', 'mes', 'entidad', 'capital_contable', 'utilidad_operativa', 'utilidad_neta', 'activo_total', 'roe_operativo', 'roa_operativo', 'roe_neto', 'roa_neto', 'meta_roe_operativo', 'meta_roa_operativo', 'meta_roe_neto', 'meta_roa_neto'],
     },
   ],
 }
@@ -437,9 +437,9 @@ export const RENTABILIDAD_CONFIG: KpiDefinition = {
     {
       id: 'detalle-gasto-credito',
       title: '4. Detalle Gasto por Crédito',
-      description: 'Excel con gastos por plaza/producto/concepto',
+      description: 'Excel con gastos por plaza/producto',
       tableName: 'kpi_rentabilidad_detalle_4',
-      columns: ['anio', 'mes', 'entidad', 'plaza', 'producto', 'concepto', 'monto', 'meta'],
+      columns: ['anio', 'mes', 'entidad', 'plaza', 'producto', 'gasto_por_credito', 'meta'],
     },
   ],
 }
@@ -1076,7 +1076,7 @@ export const GOBIERNO_CORPORATIVO_CONFIG: KpiDefinition = {
       title: 'Detalle por Comité',
       description: 'Excel con detalle por comité',
       tableName: 'kpi_gobierno_corporativo_detalle',
-      columns: ['anio', 'mes', 'comite', 'sesiones', 'acuerdos_por_area', 'kpis_reportados', 'seguimiento_politicas', 'meta'],
+      columns: ['anio', 'mes', 'comite', 'sesiones', 'acuerdos_por_area', 'kpis_reportados', 'seguimiento_politicas', 'acuerdos_cumplidos', 'meta'],
     },
   ],
 }

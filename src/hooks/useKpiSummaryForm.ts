@@ -114,7 +114,9 @@ export const useKpiSummaryForm = (
     }
   }, [])
 
-  // Persistir datos en la base de datos (INSERT nuevo registro)
+  // Persistir datos en la base de datos (INSERT para trazabilidad)
+  // El trigger en la BD marca automáticamente is_current = true para el nuevo
+  // y is_current = false para los anteriores del mismo periodo
   const persistData = useCallback(
     async (nextValues: Record<string, unknown>): Promise<boolean> => {
       if (!userId) return false
@@ -124,7 +126,9 @@ export const useKpiSummaryForm = (
       try {
         const payload: Record<string, unknown> = {
           owner_id: userId,
+          created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
+          is_current: true, // Siempre true para nuevos registros
         }
 
         // Agregar todos los valores del formulario
@@ -143,7 +147,9 @@ export const useKpiSummaryForm = (
           }
         })
 
-        // Siempre INSERT (nuevo registro)
+        // INSERT: Siempre insertar nuevo registro para mantener trazabilidad
+        // El trigger set_is_current_resumen() en la BD marca automáticamente
+        // los registros anteriores del mismo año/mes como is_current = false
         const { error } = await supabase
           .from(section.tableName)
           .insert(payload)

@@ -93,9 +93,9 @@ export interface MargenFinancieroDetalle {
   region: string
   plaza: string
   producto: string
-  concepto: string
-  valor: number
-  categoria: string
+  ingresos: number
+  costo_financiero: number
+  margen_financiero: number
   meta: number
   created_at?: string
 }
@@ -153,8 +153,17 @@ export interface RoeRoaDetalle {
   mes: number
   entidad: string
   capital_contable: number
-  utilidad_operativa_mensual: number
+  utilidad_operativa: number
+  utilidad_neta: number
   activo_total: number
+  roe_operativo: number
+  roa_operativo: number
+  roe_neto: number
+  roa_neto: number
+  meta_roe_operativo: number
+  meta_roa_operativo: number
+  meta_roe_neto: number
+  meta_roa_neto: number
   created_at?: string
 }
 
@@ -340,8 +349,7 @@ export interface RentabilidadDetalle4 {
   entidad: string
   plaza: string
   producto: string
-  concepto: string
-  monto: number
+  gasto_por_credito: number
   meta: number
   created_at?: string
 }
@@ -785,6 +793,7 @@ export interface GobiernoCorporativoDetalle {
   acuerdos_por_area: number
   kpis_reportados: number
   seguimiento_politicas: number
+  acuerdos_cumplidos: number
   meta: number
   created_at?: string
 }

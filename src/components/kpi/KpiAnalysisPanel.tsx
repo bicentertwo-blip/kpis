@@ -21,15 +21,10 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import {
-  TrendingUp,
-  TrendingDown,
-  Minus,
   BarChart3,
   LineChartIcon,
   Layers,
   Calendar,
-  ArrowUpRight,
-  ArrowDownRight,
   Sparkles,
   RefreshCw,
   ChevronDown,
@@ -40,6 +35,7 @@ import type { KpiDefinition } from '@/types/kpi-definitions'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import { cn } from '@/utils/ui'
+import { KpiMetricsCards, type MetricData } from './KpiMetricsCards'
 
 interface KpiAnalysisPanelProps {
   config: KpiDefinition
@@ -137,10 +133,17 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
   const [detalleSections, setDetalleSections] = useState<SectionData[]>([])
   const [activeResumenIndex, setActiveResumenIndex] = useState(0)
   const [activeDetalleIndex, setActiveDetalleIndex] = useState(0)
-  const [selectedYear, setSelectedYear] = useState<number | 'all'>(filters?.anio || 'all')
+  const [selectedYear, setSelectedYear] = useState<number | 'all'>(filters?.anio || new Date().getFullYear())
   const [showYearFilter, setShowYearFilter] = useState(false)
+  const [allHistoricalData, setAllHistoricalData] = useState<DataPoint[]>([])
   
   const userId = useAuthStore((state) => state.session?.user.id)
+
+  // Período actual (mes/año seleccionado o actual)
+  const currentPeriod = useMemo(() => ({
+    anio: selectedYear === 'all' ? new Date().getFullYear() : selectedYear,
+    mes: filters?.mes || new Date().getMonth() + 1,
+  }), [selectedYear, filters?.mes])
 
   // Obtener la sección activa según la vista
   const activeSections = activeView === 'resumen' ? resumenSections : detalleSections
@@ -168,6 +171,16 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
       setLoading(true)
 
       try {
+        // Cargar TODOS los datos históricos (sin filtro de año) para comparaciones
+        const allDataPromise = config.summaries.length > 0 
+          ? supabase
+              .from(config.summaries[0].tableName)
+              .select('*')
+              .order('anio', { ascending: true })
+              .order('mes', { ascending: true })
+              .order('updated_at', { ascending: false })
+          : Promise.resolve({ data: null })
+
         // Cargar datos de TODAS las tablas de resumen
         const resumenPromises = config.summaries.map(async (summary) => {
           let query = supabase
@@ -187,10 +200,15 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
           let processedData: DataPoint[] = []
 
           if (resumen && resumen.length > 0) {
-            // Filtrar para quedarnos solo con el más reciente por año/mes
+            // Filtrar para quedarnos solo con el más reciente por año/mes (is_current = true o el más reciente)
             const latestByPeriod = (resumen as Record<string, unknown>[]).reduce((acc: Record<string, Record<string, unknown>>, curr) => {
               const key = `${curr.anio}-${curr.mes}`
-              if (!acc[key] || new Date(curr.updated_at as string) > new Date(acc[key].updated_at as string)) {
+              // Priorizar is_current = true, si no, usar updated_at
+              if (!acc[key]) {
+                acc[key] = curr
+              } else if (curr.is_current === true) {
+                acc[key] = curr
+              } else if (acc[key].is_current !== true && new Date(curr.updated_at as string) > new Date(acc[key].updated_at as string)) {
                 acc[key] = curr
               }
               return acc
@@ -304,13 +322,42 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
           }
         })
 
-        const [resumenResults, detalleResults] = await Promise.all([
+        const [resumenResults, detalleResults, allDataResult] = await Promise.all([
           Promise.all(resumenPromises),
-          Promise.all(detallePromises)
+          Promise.all(detallePromises),
+          allDataPromise
         ])
 
         setResumenSections(resumenResults)
         setDetalleSections(detalleResults)
+
+        // Procesar datos históricos completos
+        if (allDataResult.data && allDataResult.data.length > 0) {
+          const latestByPeriod = (allDataResult.data as Record<string, unknown>[]).reduce((acc: Record<string, Record<string, unknown>>, curr) => {
+            const key = `${curr.anio}-${curr.mes}`
+            if (!acc[key]) {
+              acc[key] = curr
+            } else if (curr.is_current === true) {
+              acc[key] = curr
+            } else if (acc[key].is_current !== true && new Date(curr.updated_at as string) > new Date(acc[key].updated_at as string)) {
+              acc[key] = curr
+            }
+            return acc
+          }, {})
+
+          const processed = Object.values(latestByPeriod)
+            .sort((a, b) => {
+              const yearDiff = (a.anio as number) - (b.anio as number)
+              if (yearDiff !== 0) return yearDiff
+              return (a.mes as number) - (b.mes as number)
+            })
+            .map((r) => ({
+              ...r,
+              periodo: `${MONTHS_SHORT[(r.mes as number) - 1]} ${r.anio}`,
+            })) as DataPoint[]
+          
+          setAllHistoricalData(processed)
+        }
 
         // Reset index si excede el nuevo número de secciones
         if (activeResumenIndex >= resumenResults.length) {
@@ -365,6 +412,76 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
       trend: change > 0 ? 'up' : change < 0 ? 'down' : 'neutral',
     }
   }, [currentSection])
+
+  // Calcular metricsData para KpiMetricsCards
+  const metricsData = useMemo((): MetricData | null => {
+    if (!currentSection || currentSection.data.length === 0 || allHistoricalData.length === 0) return null
+
+    const data = currentSection.data
+    const numericFields = Object.keys(data[0] || {}).filter(
+      (k) => typeof data[0][k] === 'number' && !['mes', 'anio', 'count', 'is_current'].includes(k)
+    )
+    
+    // Encontrar campo de valor y campo de meta
+    const mainField = numericFields.find(f => !f.includes('meta')) || numericFields[0]
+    const metaField = numericFields.find(f => f.includes('meta') || f === 'meta')
+    
+    if (!mainField) return null
+
+    const targetYear = selectedYear === 'all' ? new Date().getFullYear() : selectedYear
+    const targetMonth = currentPeriod.mes
+
+    // Buscar el registro del mes actual
+    const currentRecord = data.find(d => d.anio === targetYear && d.mes === targetMonth)
+    const currentValue = currentRecord ? (currentRecord[mainField] as number) || 0 : 0
+    const currentMeta = currentRecord && metaField ? (currentRecord[metaField] as number) || 0 : 0
+
+    // Mes anterior
+    const prevMonth = targetMonth === 1 ? 12 : targetMonth - 1
+    const prevMonthYear = targetMonth === 1 ? targetYear - 1 : targetYear
+    const prevMonthRecord = allHistoricalData.find(d => d.anio === prevMonthYear && d.mes === prevMonth)
+    const previousMonthValue = prevMonthRecord ? (prevMonthRecord[mainField] as number) : undefined
+
+    // Mismo mes año anterior
+    const sameMonthLastYearRecord = allHistoricalData.find(d => d.anio === targetYear - 1 && d.mes === targetMonth)
+    const sameMonthLastYear = sameMonthLastYearRecord ? (sameMonthLastYearRecord[mainField] as number) : undefined
+
+    // Acumulado del año actual (hasta el mes seleccionado)
+    const ytdRecords = allHistoricalData.filter(d => d.anio === targetYear && d.mes <= targetMonth)
+    const accumulatedValue = ytdRecords.reduce((sum, d) => sum + ((d[mainField] as number) || 0), 0)
+    const accumulatedMeta = metaField 
+      ? ytdRecords.reduce((sum, d) => sum + ((d[metaField] as number) || 0), 0)
+      : 0
+
+    // Acumulado año anterior (hasta el mismo mes)
+    const ytdLastYearRecords = allHistoricalData.filter(d => d.anio === targetYear - 1 && d.mes <= targetMonth)
+    const accumulatedLastYear = ytdLastYearRecords.length > 0
+      ? ytdLastYearRecords.reduce((sum, d) => sum + ((d[mainField] as number) || 0), 0)
+      : undefined
+
+    // Datos históricos para sparkline
+    const historicalData = allHistoricalData
+      .filter(d => d[mainField] !== undefined && d[mainField] !== null)
+      .map(d => ({
+        anio: d.anio,
+        mes: d.mes,
+        value: d[mainField] as number,
+      }))
+
+    return {
+      currentValue,
+      currentMeta,
+      accumulatedValue,
+      accumulatedMeta,
+      previousMonthValue,
+      sameMonthLastYear,
+      accumulatedLastYear,
+      fieldName: mainField,
+      formatType: getFieldFormatType(mainField),
+      currentPeriod: { mes: targetMonth, anio: targetYear },
+      historicalData,
+    }
+  }, [currentSection, allHistoricalData, selectedYear, currentPeriod.mes])
 
   // Obtener keys para gráficas
   const dataKeys = useMemo(() => {
@@ -737,96 +854,10 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
         </motion.div>
       )}
 
-      {/* Métricas rápidas */}
-      <AnimatePresence mode="wait">
-        {metrics && (
-          <motion.div
-            key={activeView}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="grid grid-cols-2 sm:grid-cols-4 gap-3"
-          >
-            {/* Valor actual */}
-            <div className="glass-panel rounded-2xl p-4 border border-white/60">
-              <div className="flex items-center gap-2 mb-2">
-                <div className={cn(
-                  'w-8 h-8 rounded-xl flex items-center justify-center',
-                  metrics.trend === 'up' ? 'bg-emerald-100 text-emerald-600' :
-                  metrics.trend === 'down' ? 'bg-red-100 text-red-600' :
-                  'bg-slate-100 text-slate-600'
-                )}>
-                  {metrics.trend === 'up' ? <TrendingUp className="size-4" /> :
-                   metrics.trend === 'down' ? <TrendingDown className="size-4" /> :
-                   <Minus className="size-4" />}
-                </div>
-                <span className="text-xs text-soft-slate">Último período</span>
-              </div>
-              <p className="text-lg sm:text-xl font-bold text-vision-ink truncate">
-                {formatValue(metrics.current, metrics.field)}
-              </p>
-              <div className={cn(
-                'flex items-center gap-1 mt-1 text-xs font-medium',
-                metrics.trend === 'up' ? 'text-emerald-600' :
-                metrics.trend === 'down' ? 'text-red-600' :
-                'text-slate-500'
-              )}>
-                {metrics.trend === 'up' ? <ArrowUpRight className="size-3" /> :
-                 metrics.trend === 'down' ? <ArrowDownRight className="size-3" /> : null}
-                <span>{Math.abs(metrics.change).toFixed(1)}%</span>
-              </div>
-            </div>
-
-            {/* Promedio */}
-            <div className="glass-panel rounded-2xl p-4 border border-white/60">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-xl bg-plasma-blue/10 flex items-center justify-center">
-                  <BarChart3 className="size-4 text-plasma-blue" />
-                </div>
-                <span className="text-xs text-soft-slate">Promedio</span>
-              </div>
-              <p className="text-lg sm:text-xl font-bold text-vision-ink truncate">
-                {formatValue(metrics.average, metrics.field)}
-              </p>
-              <p className="text-xs text-soft-slate mt-1">
-                {chartData.length} períodos
-              </p>
-            </div>
-
-            {/* Máximo */}
-            <div className="glass-panel rounded-2xl p-4 border border-white/60">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center">
-                  <TrendingUp className="size-4 text-emerald-600" />
-                </div>
-                <span className="text-xs text-soft-slate">Máximo</span>
-              </div>
-              <p className="text-lg sm:text-xl font-bold text-vision-ink truncate">
-                {formatValue(metrics.max, metrics.field)}
-              </p>
-            </div>
-
-            {/* Total/Promedio acumulado - para porcentajes mostramos promedio, para montos total */}
-            <div className="glass-panel rounded-2xl p-4 border border-white/60">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-xl bg-purple-100 flex items-center justify-center">
-                  <Sparkles className="size-4 text-purple-600" />
-                </div>
-                <span className="text-xs text-soft-slate">
-                  {mainFieldFormatType === 'percentage' 
-                    ? 'Promedio general' 
-                    : `Total ${selectedYear === 'all' ? 'acumulado' : selectedYear}`}
-                </span>
-              </div>
-              <p className="text-lg sm:text-xl font-bold text-vision-ink truncate">
-                {mainFieldFormatType === 'percentage' 
-                  ? formatValue(metrics.average, metrics.field)
-                  : formatValue(metrics.total, metrics.field)}
-              </p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Nuevo Dashboard de Métricas Ejecutivo */}
+      {metricsData && activeView === 'resumen' && (
+        <KpiMetricsCards data={metricsData} loading={loading} />
+      )}
 
       {/* Gráfica principal */}
       <motion.div
@@ -886,47 +917,6 @@ export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => 
           </div>
         )}
       </motion.div>
-
-      {/* Insights automáticos */}
-      {metrics && chartData.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="glass-panel rounded-2xl p-4 border border-white/60 bg-gradient-to-br from-plasma-blue/5 to-plasma-indigo/5"
-        >
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-plasma-blue to-plasma-indigo flex items-center justify-center flex-shrink-0">
-              <Sparkles className="size-5 text-white" />
-            </div>
-            <div>
-              <h4 className="text-sm font-semibold text-vision-ink mb-1">
-                Insight automático
-              </h4>
-              <p className="text-xs text-soft-slate leading-relaxed">
-                {metrics.trend === 'up' ? (
-                  <>
-                    📈 <strong className="text-emerald-600">Tendencia positiva:</strong> El indicador creció {Math.abs(metrics.change).toFixed(1)}% respecto al período anterior. 
-                    El promedio es {formatValue(metrics.average, metrics.field)}.
-                  </>
-                ) : metrics.trend === 'down' ? (
-                  <>
-                    📉 <strong className="text-red-600">Atención:</strong> El indicador bajó {Math.abs(metrics.change).toFixed(1)}% respecto al período anterior. 
-                    Revisa las acciones correctivas necesarias.
-                  </>
-                ) : (
-                  <>
-                    ➡️ <strong className="text-slate-600">Estable:</strong> El indicador se mantiene sin cambios significativos. 
-                    {mainFieldFormatType === 'percentage' 
-                      ? `Promedio: ${formatValue(metrics.average, metrics.field)}.`
-                      : `Total acumulado: ${formatValue(metrics.total, metrics.field)}.`}
-                  </>
-                )}
-              </p>
-            </div>
-          </div>
-        </motion.div>
-      )}
     </div>
   )
 }

@@ -98,14 +98,20 @@ export const upsertSummaryRecord = async <T extends BaseRecord>(
   record: Partial<T> & { owner_id: string }
 ): Promise<{ data: T | null; error: string | null }> => {
   try {
+    // INSERT: Siempre insertar nuevo registro para mantener trazabilidad/versionamiento
+    // El trigger set_is_current_resumen() en la BD marca automáticamente:
+    // - El nuevo registro como is_current = true
+    // - Los anteriores del mismo año/mes como is_current = false
     const payload = {
       ...record,
+      created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+      is_current: true,
     }
 
     const { data, error } = await supabase
       .from(tableName)
-      .upsert(payload, { onConflict: 'owner_id,anio,mes' })
+      .insert(payload)
       .select()
       .single()
 
