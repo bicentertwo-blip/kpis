@@ -70,6 +70,14 @@ export const KpiSummaryForm = ({ section, filters }: KpiSummaryFormProps) => {
     const value = formValues[field.id]
     const hasValue = value !== undefined && value !== null && value !== ''
 
+    // Obtener el año actual del formulario para labels dinámicos
+    const currentYear = formValues['anio'] || new Date().getFullYear()
+    
+    // Label dinámico para meta_anual
+    const fieldLabel = field.id === 'meta_anual' || field.id.startsWith('meta_anual')
+      ? `${field.label} (${currentYear})`
+      : field.label
+
     // Campo especial para mes (selector)
     if (field.id === 'mes' || field.type === 'select') {
       return (
@@ -98,7 +106,7 @@ export const KpiSummaryForm = ({ section, filters }: KpiSummaryFormProps) => {
 
           <div className="mb-3 pr-16">
             <label className="text-sm font-medium text-vision-ink">
-              {field.label}
+              {fieldLabel}
               {field.required && <span className="text-plasma-blue ml-1">*</span>}
             </label>
             {field.description && (
@@ -161,7 +169,7 @@ export const KpiSummaryForm = ({ section, filters }: KpiSummaryFormProps) => {
 
           <div className="mb-3 pr-16">
             <label className="text-sm font-medium text-vision-ink">
-              {field.label}
+              {fieldLabel}
               {field.required && <span className="text-plasma-blue ml-1">*</span>}
             </label>
             {field.description && (
@@ -216,7 +224,7 @@ export const KpiSummaryForm = ({ section, filters }: KpiSummaryFormProps) => {
 
         <div className="mb-3 pr-16">
           <label className="text-sm font-medium text-vision-ink">
-            {field.label}
+            {fieldLabel}
             {field.required && <span className="text-plasma-blue ml-1">*</span>}
           </label>
           {field.description && (
