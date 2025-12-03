@@ -4,8 +4,9 @@
  * MODO MANUAL: Botón para guardar e insertar en la base de datos
  */
 
+import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Hash, DollarSign, Percent, Type, AlignLeft, ChevronDown, Check, Save, RotateCcw, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Hash, DollarSign, Percent, Type, AlignLeft, ChevronDown, Check, Save, RotateCcw, Loader2, CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react'
 import type { SectionDefinition, FieldDefinition } from '@/types/kpi-definitions'
 import { useKpiSummaryForm } from '@/hooks/useKpiSummaryForm'
 import { cn } from '@/utils/ui'
@@ -43,6 +44,8 @@ const fieldTypeConfig: Record<FieldDefinition['type'], { icon: React.ReactNode; 
 }
 
 export const KpiSummaryForm = ({ section, filters }: KpiSummaryFormProps) => {
+  const [showConfirmation, setShowConfirmation] = useState(false)
+  
   const {
     formValues,
     loading,
@@ -59,9 +62,36 @@ export const KpiSummaryForm = ({ section, filters }: KpiSummaryFormProps) => {
   } = useKpiSummaryForm(section, filters)
 
   const progress = getFormProgress()
+  
+  // Detectar si es un guardado de solo Meta Anual (sin datos mensuales)
+  const isMetaAnualOnlyMode = (): boolean => {
+    const hasMetaAnual = formValues['meta_anual'] !== undefined && 
+                          formValues['meta_anual'] !== null && 
+                          formValues['meta_anual'] !== ''
+    const hasMes = formValues['mes'] !== undefined && 
+                   formValues['mes'] !== null && 
+                   formValues['mes'] !== ''
+    
+    // Si tiene meta_anual pero NO tiene mes, es modo solo meta anual
+    return hasMetaAnual && !hasMes
+  }
 
   const handleSave = async () => {
+    // Si es modo solo meta anual, pedir confirmación
+    if (isMetaAnualOnlyMode()) {
+      setShowConfirmation(true)
+      return
+    }
     await saveAndClear()
+  }
+  
+  const handleConfirmSave = async () => {
+    setShowConfirmation(false)
+    await saveAndClear()
+  }
+  
+  const handleCancelConfirmation = () => {
+    setShowConfirmation(false)
   }
 
   const renderField = (field: FieldDefinition) => {
@@ -378,6 +408,101 @@ export const KpiSummaryForm = ({ section, filters }: KpiSummaryFormProps) => {
           )}
         </button>
       </motion.div>
+
+      {/* Modal de Confirmación para Meta Anual */}
+      {showConfirmation && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
+          onClick={handleCancelConfirmation}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            className="relative w-full max-w-md mx-4 p-6 bg-white/95 backdrop-blur-xl rounded-3xl shadow-glass border border-white/60"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Ícono de advertencia */}
+            <div className="flex justify-center mb-4">
+              <div className="w-14 h-14 rounded-2xl bg-amber-100 flex items-center justify-center">
+                <AlertTriangle className="size-7 text-amber-600" />
+              </div>
+            </div>
+
+            {/* Título y mensaje */}
+            <div className="text-center mb-6">
+              <h3 className="text-lg font-semibold text-vision-ink mb-2">
+                Confirmar Guardado de Meta Anual
+              </h3>
+              <p className="text-sm text-soft-slate leading-relaxed">
+                Estás guardando únicamente la <span className="font-medium text-plasma-blue">Meta Anual</span> para el año <span className="font-medium text-plasma-blue">{String(formValues['anio'] || new Date().getFullYear())}</span>. 
+                Esta acción es poco frecuente y generalmente se realiza una vez al inicio del año.
+              </p>
+            </div>
+
+            {/* Resumen de lo que se guardará */}
+            <div className="bg-amber-50/60 rounded-2xl p-4 mb-6 border border-amber-100">
+              <p className="text-xs font-medium text-amber-800 uppercase tracking-wide mb-2">
+                Se guardará:
+              </p>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-amber-700">Meta Anual ({String(formValues['anio'] || new Date().getFullYear())})</span>
+                <span className="text-sm font-semibold text-amber-900">
+                  {typeof formValues['meta_anual'] === 'number' || typeof formValues['meta_anual'] === 'string'
+                    ? `$${Number(formValues['meta_anual']).toLocaleString()}`
+                    : String(formValues['meta_anual'] || '')
+                  }
+                </span>
+              </div>
+            </div>
+
+            {/* Botones */}
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={handleCancelConfirmation}
+                className={cn(
+                  'flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl',
+                  'border border-gray-200 bg-white/60',
+                  'text-sm font-medium text-gray-600',
+                  'hover:bg-gray-50 hover:border-gray-300',
+                  'transition-all duration-200'
+                )}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmSave}
+                disabled={saving}
+                className={cn(
+                  'flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl',
+                  'bg-gradient-to-r from-amber-500 to-orange-500',
+                  'text-sm font-medium text-white',
+                  'hover:shadow-lg hover:scale-[1.02]',
+                  'disabled:opacity-50',
+                  'transition-all duration-200'
+                )}
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    <span>Guardando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="size-4" />
+                    <span>Sí, Guardar</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
     </div>
   )
 }
