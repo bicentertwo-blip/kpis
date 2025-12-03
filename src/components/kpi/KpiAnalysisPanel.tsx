@@ -1,922 +1,935 @@
-/**
- * Panel de Análisis para KPIs
- * Visualización de datos históricos con gráficas interactivas
- * Optimizado para móviles (iPhone-first)
- * Soporta múltiples secciones de resumen y detalle
- */
-
-import { useState, useEffect, useMemo, useCallback } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import {
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts'
-import {
-  BarChart3,
-  LineChartIcon,
-  Layers,
-  Calendar,
-  Sparkles,
-  RefreshCw,
+import { motion, AnimatePresence } from 'framer-motion';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, LineChart, Line, Legend } from 'recharts';
+import { 
+  TrendingUp, 
+  TrendingDown, 
+  Calendar, 
+  BarChart2, 
+  Activity,
+  Target,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-} from 'lucide-react'
-import type { KpiDefinition } from '@/types/kpi-definitions'
-import { supabase } from '@/lib/supabase'
-import { useAuthStore } from '@/store/auth'
-import { cn } from '@/utils/ui'
-import { KpiMetricsCards, type MetricData } from './KpiMetricsCards'
+  CheckCircle2,
+  AlertTriangle,
+  Clock,
+  Loader2
+} from 'lucide-react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { supabase } from '@/lib/supabase';
+import type { KpiDefinition } from '@/types/kpi-definitions';
 
 interface KpiAnalysisPanelProps {
-  config: KpiDefinition
-  filters?: {
-    anio: number
-    mes: number
-  }
+  config: KpiDefinition;
+  filters: { anio: number; mes: number };
 }
 
-type AnalysisView = 'resumen' | 'detalle'
-type ChartType = 'area' | 'bar' | 'line'
+const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const FULL_MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
-interface DataPoint {
-  periodo: string
-  mes: number
-  anio: number
-  [key: string]: string | number
-}
+type SummaryRecord = Record<string, unknown>;
 
-interface SectionData {
-  id: string
-  title: string
-  tableName: string
-  data: DataPoint[]
-  lastUploadInfo?: { date: string; count: number } | null
-}
+export function KpiAnalysisPanel({
+  config,
+  filters: initialFilters
+}: KpiAnalysisPanelProps) {
+  const [activeView, setActiveView] = useState<'overview' | 'monthly' | 'accumulated' | 'annual'>('overview');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [summaryData, setSummaryData] = useState<SummaryRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedYear, setSelectedYear] = useState<number>(initialFilters.anio);
 
-// Colores para gráficas
-const PIE_COLORS = ['#4F46E5', '#06B6D4', '#8B5CF6', '#F59E0B', '#10B981', '#EF4444', '#EC4899', '#6366F1']
+  // Detectar la clave de métrica principal del primer resumen
+  const metricKey = useMemo(() => {
+    const firstSummary = config.summaries[0];
+    if (!firstSummary?.fields) return 'valor';
+    // Buscar el primer campo que no sea anio, mes, meta o meta_anual
+    const metricField = firstSummary.fields.find(
+      f => !['anio', 'mes', 'meta', 'meta_anual'].includes(f.id)
+    );
+    return metricField?.id || 'valor';
+  }, [config.summaries]);
 
-const MONTHS_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+  const metricLabel = useMemo(() => {
+    const firstSummary = config.summaries[0];
+    if (!firstSummary?.fields) return 'Valor';
+    const metricField = firstSummary.fields.find(f => f.id === metricKey);
+    return metricField?.label || 'Valor';
+  }, [config.summaries, metricKey]);
 
-// Campos que deben mostrarse como porcentaje (coincidencia exacta)
-const PERCENTAGE_FIELDS = new Set([
-  'roe', 'roa', 'meta_roe', 'meta_roa',
-  'indice_renovacion',
-  'imor', 'crecimiento',
-  'indice_rotacion', 'ausentismo', 'permanencia_12m',
-  'procesos_digitalizados', 'transacciones_automaticas',
-  'recordacion_marca',
-  'quejas_72h', 'clima_laboral',
-  'reportes_a_tiempo',
-  'exposicion',
-  'acuerdos_cumplidos'
-])
+  // Determinar si es porcentaje o moneda
+  const isPercentage = useMemo(() => {
+    const firstSummary = config.summaries[0];
+    if (!firstSummary?.fields) return false;
+    const metricField = firstSummary.fields.find(f => f.id === metricKey);
+    return metricField?.type === 'percentage';
+  }, [config.summaries, metricKey]);
 
-// Campos que deben mostrarse como números simples (días, conteos, scores, etc.)
-const SIMPLE_NUMBER_FIELDS = new Set([
-  // Días
-  'dias_sin_cubrir', 'meta_dias', 'dias',
-  // Conteos de personal
-  'vacantes', 'contrataciones', 'bajas',
-  'empleados', 'total_empleados', 'hc', 'ingresos',
-  'count', 'cantidad',
-  // NPS y scores
-  'nps',
-  // Innovación
-  'ideas_registradas', 'proyectos_activos',
-  // Riesgos
-  'riesgos_activos', 'riesgos_mitigados', 'incidentes_criticos', 'riesgos_nuevos',
-  // Gobierno corporativo
-  'reuniones_consejo', 'actualizaciones_politica', 'sesiones',
-  // Cumplimiento
-  'observaciones_cnbv_condusef', 'observaciones',
-  // Alcance (números grandes pero no moneda)
-  'alcance_campanas'
-])
+  const formatValue = useCallback((v: number): string => {
+    if (v === null || v === undefined) return '-';
+    if (isPercentage) return `${v.toFixed(2)}%`;
+    return v.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 0 });
+  }, [isPercentage]);
 
-// Tipos de formato de campo
-type FieldFormatType = 'percentage' | 'number' | 'currency'
-
-// Función para detectar el tipo de formato de un campo
-const getFieldFormatType = (fieldName: string): FieldFormatType => {
-  const lowerField = fieldName.toLowerCase()
-  
-  // Porcentajes
-  if (PERCENTAGE_FIELDS.has(lowerField)) return 'percentage'
-  if (lowerField.endsWith('_pct')) return 'percentage'
-  if (lowerField.endsWith('_%')) return 'percentage'
-  
-  // Números simples (días, conteos)
-  if (SIMPLE_NUMBER_FIELDS.has(lowerField)) return 'number'
-  if (lowerField.includes('dias')) return 'number'
-  if (lowerField.includes('count')) return 'number'
-  
-  // Por defecto, moneda
-  return 'currency'
-}
-
-export const KpiAnalysisPanel = ({ config, filters }: KpiAnalysisPanelProps) => {
-  const [activeView, setActiveView] = useState<AnalysisView>('resumen')
-  const [chartType, setChartType] = useState<ChartType>('area')
-  const [loading, setLoading] = useState(true)
-  const [resumenSections, setResumenSections] = useState<SectionData[]>([])
-  const [detalleSections, setDetalleSections] = useState<SectionData[]>([])
-  const [activeResumenIndex, setActiveResumenIndex] = useState(0)
-  const [activeDetalleIndex, setActiveDetalleIndex] = useState(0)
-  const [selectedYear, setSelectedYear] = useState<number | 'all'>(filters?.anio || new Date().getFullYear())
-  const [showYearFilter, setShowYearFilter] = useState(false)
-  const [allHistoricalData, setAllHistoricalData] = useState<DataPoint[]>([])
-  
-  const userId = useAuthStore((state) => state.session?.user.id)
-
-  // Período actual (mes/año seleccionado o actual)
-  const currentPeriod = useMemo(() => ({
-    anio: selectedYear === 'all' ? new Date().getFullYear() : selectedYear,
-    mes: filters?.mes || new Date().getMonth() + 1,
-  }), [selectedYear, filters?.mes])
-
-  // Obtener la sección activa según la vista
-  const activeSections = activeView === 'resumen' ? resumenSections : detalleSections
-  const activeIndex = activeView === 'resumen' ? activeResumenIndex : activeDetalleIndex
-  const setActiveIndex = activeView === 'resumen' ? setActiveResumenIndex : setActiveDetalleIndex
-  const currentSection = activeSections[activeIndex]
-
-  // Navegar entre secciones
-  const goToNextSection = useCallback(() => {
-    if (activeIndex < activeSections.length - 1) {
-      setActiveIndex(activeIndex + 1)
-    }
-  }, [activeIndex, activeSections.length, setActiveIndex])
-
-  const goToPrevSection = useCallback(() => {
-    if (activeIndex > 0) {
-      setActiveIndex(activeIndex - 1)
-    }
-  }, [activeIndex, setActiveIndex])
-
-  // Cargar datos de todas las secciones
+  // Cargar datos del primer resumen
   useEffect(() => {
-    const fetchData = async () => {
-      if (!userId) return
-      setLoading(true)
-
-      try {
-        // Cargar TODOS los datos históricos (sin filtro de año) para comparaciones
-        const allDataPromise = config.summaries.length > 0 
-          ? supabase
-              .from(config.summaries[0].tableName)
-              .select('*')
-              .order('anio', { ascending: true })
-              .order('mes', { ascending: true })
-              .order('updated_at', { ascending: false })
-          : Promise.resolve({ data: null })
-
-        // Cargar datos de TODAS las tablas de resumen
-        const resumenPromises = config.summaries.map(async (summary) => {
-          let query = supabase
-            .from(summary.tableName)
-            .select('*')
-          
-          // Filtrar por año solo si no es "all"
-          if (selectedYear !== 'all') {
-            query = query.eq('anio', selectedYear)
-          }
-          
-          const { data: resumen } = await query
-            .order('anio', { ascending: true })
-            .order('mes', { ascending: true })
-            .order('updated_at', { ascending: false })
-
-          let processedData: DataPoint[] = []
-
-          if (resumen && resumen.length > 0) {
-            // Filtrar para quedarnos solo con el más reciente por año/mes (is_current = true o el más reciente)
-            const latestByPeriod = (resumen as Record<string, unknown>[]).reduce((acc: Record<string, Record<string, unknown>>, curr) => {
-              const key = `${curr.anio}-${curr.mes}`
-              // Priorizar is_current = true, si no, usar updated_at
-              if (!acc[key]) {
-                acc[key] = curr
-              } else if (curr.is_current === true) {
-                acc[key] = curr
-              } else if (acc[key].is_current !== true && new Date(curr.updated_at as string) > new Date(acc[key].updated_at as string)) {
-                acc[key] = curr
-              }
-              return acc
-            }, {})
-
-            processedData = Object.values(latestByPeriod)
-              .sort((a, b) => {
-                const yearDiff = (a.anio as number) - (b.anio as number)
-                if (yearDiff !== 0) return yearDiff
-                return (a.mes as number) - (b.mes as number)
-              })
-              .map((r) => ({
-                ...r,
-                periodo: `${MONTHS_SHORT[(r.mes as number) - 1]} ${r.anio}`,
-              })) as DataPoint[]
-          }
-
-          return {
-            id: summary.id,
-            title: summary.title,
-            tableName: summary.tableName,
-            data: processedData,
-          }
-        })
-
-        // Cargar datos de TODAS las tablas de detalle
-        const detallePromises = config.details.map(async (detail) => {
-          // Primero obtener la fecha de la última carga
-          let lastRecordQuery = supabase
-            .from(detail.tableName)
-            .select('created_at')
-          
-          if (selectedYear !== 'all') {
-            lastRecordQuery = lastRecordQuery.eq('anio', selectedYear)
-          }
-          
-          const { data: lastRecord } = await lastRecordQuery
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single()
-
-          let processedData: DataPoint[] = []
-          let lastUploadInfo: { date: string; count: number } | null = null
-
-          if (lastRecord) {
-            const lastUploadDate = new Date(lastRecord.created_at as string)
-            const startTime = new Date(lastUploadDate.getTime() - 60000).toISOString()
-            const endTime = new Date(lastUploadDate.getTime() + 60000).toISOString()
-
-            let detalleQuery = supabase
-              .from(detail.tableName)
-              .select('*')
-            
-            if (selectedYear !== 'all') {
-              detalleQuery = detalleQuery.eq('anio', selectedYear)
-            }
-            
-            const { data: detalle } = await detalleQuery
-              .gte('created_at', startTime)
-              .lte('created_at', endTime)
-              .order('anio', { ascending: true })
-              .order('mes', { ascending: true })
-
-            if (detalle && detalle.length > 0) {
-              lastUploadInfo = {
-                date: lastUploadDate.toLocaleDateString('es-MX', { 
-                  day: 'numeric', 
-                  month: 'short', 
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                }),
-                count: detalle.length
-              }
-
-              // Agrupar por año/mes
-              const grouped = (detalle as Record<string, unknown>[]).reduce((acc: Record<string, DataPoint>, curr) => {
-                const key = `${curr.anio}-${curr.mes}`
-                const mes = curr.mes as number
-                const anio = curr.anio as number
-                if (!acc[key]) {
-                  acc[key] = {
-                    periodo: `${MONTHS_SHORT[mes - 1]} ${anio}`,
-                    mes,
-                    anio,
-                    count: 0,
-                  }
-                }
-                acc[key].count = (acc[key].count as number) + 1
-                Object.keys(curr).forEach((k) => {
-                  if (typeof curr[k] === 'number' && !['mes', 'anio'].includes(k)) {
-                    acc[key][k] = ((acc[key][k] as number) || 0) + (curr[k] as number)
-                  }
-                })
-                return acc
-              }, {})
-              processedData = Object.values(grouped).sort((a, b) => {
-                const yearDiff = a.anio - b.anio
-                if (yearDiff !== 0) return yearDiff
-                return a.mes - b.mes
-              })
-            }
-          }
-
-          return {
-            id: detail.id,
-            title: detail.title,
-            tableName: detail.tableName,
-            data: processedData,
-            lastUploadInfo,
-          }
-        })
-
-        const [resumenResults, detalleResults, allDataResult] = await Promise.all([
-          Promise.all(resumenPromises),
-          Promise.all(detallePromises),
-          allDataPromise
-        ])
-
-        setResumenSections(resumenResults)
-        setDetalleSections(detalleResults)
-
-        // Procesar datos históricos completos
-        if (allDataResult.data && allDataResult.data.length > 0) {
-          const latestByPeriod = (allDataResult.data as Record<string, unknown>[]).reduce((acc: Record<string, Record<string, unknown>>, curr) => {
-            const key = `${curr.anio}-${curr.mes}`
-            if (!acc[key]) {
-              acc[key] = curr
-            } else if (curr.is_current === true) {
-              acc[key] = curr
-            } else if (acc[key].is_current !== true && new Date(curr.updated_at as string) > new Date(acc[key].updated_at as string)) {
-              acc[key] = curr
-            }
-            return acc
-          }, {})
-
-          const processed = Object.values(latestByPeriod)
-            .sort((a, b) => {
-              const yearDiff = (a.anio as number) - (b.anio as number)
-              if (yearDiff !== 0) return yearDiff
-              return (a.mes as number) - (b.mes as number)
-            })
-            .map((r) => ({
-              ...r,
-              periodo: `${MONTHS_SHORT[(r.mes as number) - 1]} ${r.anio}`,
-            })) as DataPoint[]
-          
-          setAllHistoricalData(processed)
-        }
-
-        // Reset index si excede el nuevo número de secciones
-        if (activeResumenIndex >= resumenResults.length) {
-          setActiveResumenIndex(0)
-        }
-        if (activeDetalleIndex >= detalleResults.length) {
-          setActiveDetalleIndex(0)
-        }
-
-      } catch (error) {
-        console.error('Error cargando datos de análisis:', error)
-      } finally {
-        setLoading(false)
+    const loadData = async () => {
+      const tableName = config.summaries[0]?.tableName;
+      if (!tableName) {
+        setLoading(false);
+        return;
       }
-    }
 
-    fetchData()
-  }, [userId, config.summaries, config.details, selectedYear, activeResumenIndex, activeDetalleIndex])
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from(tableName)
+          .select('*')
+          .eq('is_current', true)
+          .order('anio', { ascending: true })
+          .order('mes', { ascending: true });
 
-  // Datos actuales para la gráfica
-  const chartData = currentSection?.data || []
+        if (error) throw error;
+        setSummaryData((data || []) as SummaryRecord[]);
+      } catch (err) {
+        console.error('Error loading summary data:', err);
+        setSummaryData([]);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  // Calcular métricas
-  const metrics = useMemo(() => {
-    if (!currentSection || currentSection.data.length === 0) return null
-
-    const data = currentSection.data
-    const numericFields = Object.keys(data[0] || {}).filter(
-      (k) => typeof data[0][k] === 'number' && !['mes', 'anio', 'count'].includes(k)
-    )
-    const mainField = numericFields[0]
-    if (!mainField) return null
-
-    const values = data.map((d) => d[mainField] as number).filter((v) => !isNaN(v))
-    const current = values[values.length - 1] || 0
-    const previous = values[values.length - 2] || 0
-    const change = previous ? ((current - previous) / previous) * 100 : 0
-    const total = values.reduce((a, b) => a + b, 0)
-    const average = values.length ? total / values.length : 0
-    const max = Math.max(...values)
-    const min = Math.min(...values)
-
-    return {
-      field: mainField,
-      current,
-      previous,
-      change,
-      total,
-      average,
-      max,
-      min,
-      trend: change > 0 ? 'up' : change < 0 ? 'down' : 'neutral',
-    }
-  }, [currentSection])
-
-  // Calcular metricsData para KpiMetricsCards
-  const metricsData = useMemo((): MetricData | null => {
-    if (!currentSection || currentSection.data.length === 0 || allHistoricalData.length === 0) return null
-
-    const data = currentSection.data
-    const numericFields = Object.keys(data[0] || {}).filter(
-      (k) => typeof data[0][k] === 'number' && !['mes', 'anio', 'count', 'is_current'].includes(k)
-    )
-    
-    // Encontrar campo de valor y campo de meta
-    const mainField = numericFields.find(f => !f.includes('meta')) || numericFields[0]
-    const metaField = numericFields.find(f => f.includes('meta') || f === 'meta')
-    
-    if (!mainField) return null
-
-    const targetYear = selectedYear === 'all' ? new Date().getFullYear() : selectedYear
-    const targetMonth = currentPeriod.mes
-
-    // Buscar el registro del mes actual
-    const currentRecord = data.find(d => d.anio === targetYear && d.mes === targetMonth)
-    const currentValue = currentRecord ? (currentRecord[mainField] as number) || 0 : 0
-    const currentMeta = currentRecord && metaField ? (currentRecord[metaField] as number) || 0 : 0
-
-    // Mes anterior
-    const prevMonth = targetMonth === 1 ? 12 : targetMonth - 1
-    const prevMonthYear = targetMonth === 1 ? targetYear - 1 : targetYear
-    const prevMonthRecord = allHistoricalData.find(d => d.anio === prevMonthYear && d.mes === prevMonth)
-    const previousMonthValue = prevMonthRecord ? (prevMonthRecord[mainField] as number) : undefined
-
-    // Mismo mes año anterior
-    const sameMonthLastYearRecord = allHistoricalData.find(d => d.anio === targetYear - 1 && d.mes === targetMonth)
-    const sameMonthLastYear = sameMonthLastYearRecord ? (sameMonthLastYearRecord[mainField] as number) : undefined
-
-    // Acumulado del año actual (hasta el mes seleccionado)
-    const ytdRecords = allHistoricalData.filter(d => d.anio === targetYear && d.mes <= targetMonth)
-    const accumulatedValue = ytdRecords.reduce((sum, d) => sum + ((d[mainField] as number) || 0), 0)
-    const accumulatedMeta = metaField 
-      ? ytdRecords.reduce((sum, d) => sum + ((d[metaField] as number) || 0), 0)
-      : 0
-
-    // Acumulado año anterior (hasta el mismo mes)
-    const ytdLastYearRecords = allHistoricalData.filter(d => d.anio === targetYear - 1 && d.mes <= targetMonth)
-    const accumulatedLastYear = ytdLastYearRecords.length > 0
-      ? ytdLastYearRecords.reduce((sum, d) => sum + ((d[mainField] as number) || 0), 0)
-      : undefined
-
-    // Datos históricos para sparkline
-    const historicalData = allHistoricalData
-      .filter(d => d[mainField] !== undefined && d[mainField] !== null)
-      .map(d => ({
-        anio: d.anio,
-        mes: d.mes,
-        value: d[mainField] as number,
-      }))
-
-    return {
-      currentValue,
-      currentMeta,
-      accumulatedValue,
-      accumulatedMeta,
-      previousMonthValue,
-      sameMonthLastYear,
-      accumulatedLastYear,
-      fieldName: mainField,
-      formatType: getFieldFormatType(mainField),
-      currentPeriod: { mes: targetMonth, anio: targetYear },
-      historicalData,
-    }
-  }, [currentSection, allHistoricalData, selectedYear, currentPeriod.mes])
-
-  // Obtener keys para gráficas
-  const dataKeys = useMemo(() => {
-    if (chartData.length === 0) return []
-    return Object.keys(chartData[0] || {}).filter(
-      (k) => typeof chartData[0][k] === 'number' && !['mes', 'anio'].includes(k)
-    ).slice(0, 3)
-  }, [chartData])
-
-  // Detectar el tipo de formato del campo principal
-  const mainFieldFormatType = useMemo(() => {
-    if (!metrics?.field) return 'currency' as FieldFormatType
-    return getFieldFormatType(metrics.field)
-  }, [metrics?.field])
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('es-MX', {
-      style: 'currency',
-      currency: 'MXN',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value)
-  }
-
-  const formatSimpleNumber = (value: number) => {
-    if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`
-    if (value >= 1000) return `${(value / 1000).toFixed(1)}K`
-    return value.toLocaleString('es-MX', { maximumFractionDigits: 1 })
-  }
-
-  // Formato de números para el eje Y (usa el campo principal)
-  const formatNumber = (value: number) => {
-    switch (mainFieldFormatType) {
-      case 'percentage':
-        return `${value.toFixed(1)}%`
-      case 'number':
-        return formatSimpleNumber(value)
-      case 'currency':
-      default:
-        if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`
-        if (value >= 1000) return `${(value / 1000).toFixed(1)}K`
-        return value.toFixed(0)
-    }
-  }
-
-  // Formato inteligente basado en el tipo de campo específico
-  const formatValue = (value: number, fieldName?: string) => {
-    const formatType = fieldName ? getFieldFormatType(fieldName) : mainFieldFormatType
-    switch (formatType) {
-      case 'percentage':
-        return `${value.toFixed(1)}%`
-      case 'number':
-        return formatSimpleNumber(value)
-      case 'currency':
-      default:
-        return formatCurrency(value)
-    }
-  }
-
-  // Tooltip personalizado - formatea cada campo según su tipo
-  const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; dataKey: string; color: string }>; label?: string }) => {
-    if (!active || !payload?.length) return null
-
-    return (
-      <div className="glass-panel rounded-xl p-3 shadow-lg border border-white/60">
-        <p className="text-xs font-semibold text-vision-ink mb-2">{label}</p>
-        {payload.map((entry, index) => (
-          <div key={index} className="flex items-center gap-2 text-xs">
-            <div
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: entry.color }}
-            />
-            <span className="text-soft-slate capitalize">{entry.dataKey.replace(/_/g, ' ')}:</span>
-            <span className="font-semibold text-vision-ink">{formatValue(entry.value, entry.dataKey)}</span>
-          </div>
-        ))}
-      </div>
-    )
-  }
-
-  // Renderizar gráfica
-  const renderChart = () => {
-    if (chartData.length === 0) {
-      return (
-        <div className="flex flex-col items-center justify-center h-64 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-plasma-blue/10 to-plasma-indigo/10 flex items-center justify-center mb-4">
-            <BarChart3 className="size-8 text-plasma-blue/50" />
-          </div>
-          <p className="text-soft-slate text-sm">Sin datos {selectedYear === 'all' ? 'disponibles' : `para ${selectedYear}`}</p>
-          <p className="text-soft-slate/60 text-xs mt-1">Captura información en Resumen o importa datos</p>
-        </div>
-      )
-    }
-
-    const commonProps = {
-      data: chartData,
-      margin: { top: 10, right: 10, left: -20, bottom: 0 },
-    }
-
-    const xAxisProps = {
-      dataKey: 'periodo',
-      tick: { fontSize: 10, fill: '#64748B' },
-      tickLine: false,
-      axisLine: false,
-    }
-
-    const yAxisProps = {
-      tick: { fontSize: 10, fill: '#64748B' },
-      tickLine: false,
-      axisLine: false,
-      tickFormatter: formatNumber,
-    }
-
-    const gridProps = {
-      strokeDasharray: '3 3',
-      stroke: '#E2E8F0',
-      vertical: false,
-    }
-
-    return (
-      <ResponsiveContainer width="100%" height={280}>
-        {chartType === 'area' ? (
-          <AreaChart {...commonProps}>
-            <defs>
-              {dataKeys.map((key, i) => (
-                <linearGradient key={key} id={`gradient-${i}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={PIE_COLORS[i]} stopOpacity={0.3} />
-                  <stop offset="95%" stopColor={PIE_COLORS[i]} stopOpacity={0} />
-                </linearGradient>
-              ))}
-            </defs>
-            <CartesianGrid {...gridProps} />
-            <XAxis {...xAxisProps} />
-            <YAxis {...yAxisProps} />
-            <Tooltip content={<CustomTooltip />} />
-            {dataKeys.map((key, i) => (
-              <Area
-                key={key}
-                type="monotone"
-                dataKey={key}
-                stroke={PIE_COLORS[i]}
-                strokeWidth={2}
-                fill={`url(#gradient-${i})`}
-              />
-            ))}
-          </AreaChart>
-        ) : chartType === 'bar' ? (
-          <BarChart {...commonProps}>
-            <CartesianGrid {...gridProps} />
-            <XAxis {...xAxisProps} />
-            <YAxis {...yAxisProps} />
-            <Tooltip content={<CustomTooltip />} />
-            {dataKeys.map((key, i) => (
-              <Bar
-                key={key}
-                dataKey={key}
-                fill={PIE_COLORS[i]}
-                radius={[4, 4, 0, 0]}
-              />
-            ))}
-          </BarChart>
-        ) : (
-          <LineChart {...commonProps}>
-            <CartesianGrid {...gridProps} />
-            <XAxis {...xAxisProps} />
-            <YAxis {...yAxisProps} />
-            <Tooltip content={<CustomTooltip />} />
-            {dataKeys.map((key, i) => (
-              <Line
-                key={key}
-                type="monotone"
-                dataKey={key}
-                stroke={PIE_COLORS[i]}
-                strokeWidth={2}
-                dot={{ fill: PIE_COLORS[i], strokeWidth: 0, r: 3 }}
-                activeDot={{ r: 5, strokeWidth: 0 }}
-              />
-            ))}
-          </LineChart>
-        )}
-      </ResponsiveContainer>
-    )
-  }
+    loadData();
+  }, [config.summaries]);
 
   // Años disponibles
-  const years = useMemo(() => {
-    const currentYear = new Date().getFullYear()
-    return Array.from({ length: 5 }, (_, i) => currentYear - i)
-  }, [])
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    summaryData.forEach((item: SummaryRecord) => {
+      const year = Number(item.anio);
+      if (year) years.add(year);
+    });
+    return Array.from(years).sort((a, b) => b - a);
+  }, [summaryData]);
 
-  // Opciones de año incluyendo "Todos"
-  type YearOption = { value: number | 'all'; label: string }
-  const yearOptions: YearOption[] = useMemo(() => [
-    { value: 'all', label: 'Todos los años' },
-    ...years.map(y => ({ value: y, label: String(y) }))
-  ], [years])
+  // Seleccionar año más reciente si no hay seleccionado
+  useEffect(() => {
+    if (availableYears.length > 0 && !availableYears.includes(selectedYear)) {
+      setSelectedYear(availableYears[0]);
+    }
+  }, [availableYears, selectedYear]);
+
+  // Agrupar datos por año
+  const dataByYear = useMemo(() => {
+    const grouped: Record<number, SummaryRecord[]> = {};
+    summaryData.forEach((item: SummaryRecord) => {
+      const year = Number(item.anio);
+      if (!grouped[year]) grouped[year] = [];
+      grouped[year].push(item);
+    });
+    // Ordenar cada año por mes
+    Object.keys(grouped).forEach(year => {
+      grouped[Number(year)].sort((a, b) => Number(a.mes) - Number(b.mes));
+    });
+    return grouped;
+  }, [summaryData]);
+
+  // Datos del año seleccionado
+  const currentYearData = useMemo(() => {
+    if (!selectedYear || !dataByYear[selectedYear]) return [];
+    return dataByYear[selectedYear];
+  }, [selectedYear, dataByYear]);
+
+  // Obtener meta anual del año seleccionado
+  const metaAnual = useMemo(() => {
+    const withMeta = currentYearData.find((item: SummaryRecord) => item.meta_anual !== null && item.meta_anual !== undefined);
+    return withMeta ? Number(withMeta.meta_anual) : null;
+  }, [currentYearData]);
+
+  // Datos para gráfica mensual
+  const monthlyChartData = useMemo(() => {
+    return MONTH_NAMES.map((month, index) => {
+      const monthNum = index + 1;
+      const entry: Record<string, unknown> = { mes: month, mesNum: monthNum };
+      
+      // Agregar datos de cada año disponible
+      availableYears.forEach((year: number) => {
+        const yearData = dataByYear[year]?.find((d: SummaryRecord) => Number(d.mes) === monthNum);
+        entry[`valor_${year}`] = yearData ? Number(yearData[metricKey]) || 0 : null;
+      });
+      
+      return entry;
+    });
+  }, [dataByYear, availableYears, metricKey]);
+
+  // Datos acumulados por año
+  const accumulatedChartData = useMemo(() => {
+    return MONTH_NAMES.map((month, index) => {
+      const monthNum = index + 1;
+      const entry: Record<string, unknown> = { mes: month, mesNum: monthNum };
+      
+      availableYears.forEach((year: number) => {
+        const yearData = dataByYear[year] || [];
+        const accumulated = yearData
+          .filter((d: SummaryRecord) => Number(d.mes) <= monthNum)
+          .reduce((sum: number, d: SummaryRecord) => sum + (Number(d[metricKey]) || 0), 0);
+        entry[`acumulado_${year}`] = accumulated || null;
+      });
+      
+      // Agregar meta anual como línea de referencia
+      if (metaAnual) {
+        entry['meta_anual'] = metaAnual;
+      }
+      
+      return entry;
+    });
+  }, [dataByYear, availableYears, metricKey, metaAnual]);
+
+  // Métricas del mes más reciente
+  const latestMetrics = useMemo(() => {
+    if (currentYearData.length === 0) return null;
+    const latest = currentYearData[currentYearData.length - 1];
+    const latestMonth = Number(latest.mes);
+    
+    // Buscar mismo mes en años anteriores
+    const previousYearComparisons: Record<number, { value: number; change: number; changePercent: number }> = {};
+    
+    availableYears.filter((y: number) => y !== selectedYear).forEach((year: number) => {
+      const sameMonthData = dataByYear[year]?.find((d: SummaryRecord) => Number(d.mes) === latestMonth);
+      if (sameMonthData) {
+        const prevValue = Number(sameMonthData[metricKey]) || 0;
+        const currentValue = Number(latest[metricKey]) || 0;
+        previousYearComparisons[year] = {
+          value: prevValue,
+          change: currentValue - prevValue,
+          changePercent: prevValue !== 0 ? ((currentValue - prevValue) / prevValue) * 100 : 0
+        };
+      }
+    });
+
+    // Calcular acumulado actual
+    const currentAccumulated = currentYearData.reduce((sum: number, d: SummaryRecord) => sum + (Number(d[metricKey]) || 0), 0);
+    
+    // Comparar acumulado con años anteriores
+    const accumulatedComparisons: Record<number, { value: number; change: number; changePercent: number }> = {};
+    
+    availableYears.filter((y: number) => y !== selectedYear).forEach((year: number) => {
+      const yearData = dataByYear[year] || [];
+      const prevAccumulated = yearData
+        .filter((d: SummaryRecord) => Number(d.mes) <= latestMonth)
+        .reduce((sum: number, d: SummaryRecord) => sum + (Number(d[metricKey]) || 0), 0);
+      
+      if (prevAccumulated > 0) {
+        accumulatedComparisons[year] = {
+          value: prevAccumulated,
+          change: currentAccumulated - prevAccumulated,
+          changePercent: ((currentAccumulated - prevAccumulated) / prevAccumulated) * 100
+        };
+      }
+    });
+
+    // Progreso hacia meta anual
+    let metaProgress = null;
+    if (metaAnual && metaAnual > 0) {
+      metaProgress = {
+        current: currentAccumulated,
+        target: metaAnual,
+        percent: (currentAccumulated / metaAnual) * 100,
+        remaining: metaAnual - currentAccumulated,
+        monthsRemaining: 12 - latestMonth,
+        projectedAnnual: latestMonth > 0 ? (currentAccumulated / latestMonth) * 12 : 0
+      };
+    }
+
+    return {
+      current: Number(latest[metricKey]) || 0,
+      month: latestMonth,
+      monthName: FULL_MONTH_NAMES[latestMonth - 1],
+      accumulated: currentAccumulated,
+      previousYearComparisons,
+      accumulatedComparisons,
+      metaProgress
+    };
+  }, [currentYearData, dataByYear, availableYears, selectedYear, metricKey, metaAnual]);
+
+  // Colores para años en gráficas
+  const yearColors: Record<number, string> = useMemo(() => {
+    const palette = ['#10b981', '#6366f1', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+    const colors: Record<number, string> = {};
+    [...availableYears].sort((a, b) => b - a).forEach((year: number, index: number) => {
+      colors[year] = palette[index % palette.length];
+    });
+    return colors;
+  }, [availableYears]);
+
+  const renderTrend = (value: number, size: 'sm' | 'md' = 'sm') => {
+    const isPositive = value >= 0;
+    const Icon = isPositive ? TrendingUp : TrendingDown;
+    const colorClass = isPositive ? 'text-emerald-400' : 'text-rose-400';
+    const iconSize = size === 'sm' ? 14 : 18;
+    
+    return (
+      <span className={`inline-flex items-center gap-1 ${colorClass}`}>
+        <Icon size={iconSize} />
+        <span className={size === 'sm' ? 'text-xs' : 'text-sm'}>
+          {isPositive ? '+' : ''}{value.toFixed(1)}%
+        </span>
+      </span>
+    );
+  };
+
+  const renderComparisonCard = (
+    title: string,
+    comparisons: Record<number, { value: number; change: number; changePercent: number }>,
+    format: (v: number) => string
+  ) => {
+    const years = Object.keys(comparisons).map(Number).sort((a, b) => b - a);
+    
+    if (years.length === 0) {
+      return (
+        <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
+          <h4 className="text-white/60 text-sm mb-2">{title}</h4>
+          <p className="text-white/40 text-xs">Sin datos de años anteriores</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
+        <h4 className="text-white/60 text-sm mb-3">{title}</h4>
+        <div className="space-y-2">
+          {years.slice(0, 3).map(year => {
+            const comp = comparisons[year];
+            return (
+              <div key={year} className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div 
+                    className="w-2 h-2 rounded-full" 
+                    style={{ backgroundColor: yearColors[year] }}
+                  />
+                  <span className="text-white/70 text-sm">{year}</span>
+                  <span className="text-white/40 text-xs">({format(comp.value)})</span>
+                </div>
+                {renderTrend(comp.changePercent)}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const renderMetaProgress = () => {
+    if (!latestMetrics?.metaProgress) return null;
+    
+    const { current, target, percent, remaining, monthsRemaining, projectedAnnual } = latestMetrics.metaProgress;
+    const isOnTrack = projectedAnnual >= target;
+    const progressColor = percent >= 100 ? '#10b981' : percent >= 75 ? '#f59e0b' : percent >= 50 ? '#6366f1' : '#ef4444';
+    
+    return (
+      <motion.div 
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm rounded-xl p-5 border border-white/10"
+      >
+        <div className="flex items-center gap-2 mb-4">
+          <Target className="text-amber-400" size={20} />
+          <h4 className="text-white font-medium">Progreso hacia Meta Anual</h4>
+        </div>
+        
+        {/* Barra de progreso */}
+        <div className="relative h-4 bg-white/10 rounded-full overflow-hidden mb-4">
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${Math.min(percent, 100)}%` }}
+            transition={{ duration: 1, ease: "easeOut" }}
+            className="absolute inset-y-0 left-0 rounded-full"
+            style={{ backgroundColor: progressColor }}
+          />
+          {percent > 100 && (
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${Math.min(percent - 100, 100)}%` }}
+              transition={{ duration: 0.5, delay: 1 }}
+              className="absolute inset-y-0 right-0 bg-emerald-500/50 rounded-r-full"
+            />
+          )}
+        </div>
+        
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+          <div>
+            <p className="text-white/50 text-xs mb-1">Acumulado</p>
+            <p className="text-white font-semibold">{formatValue(current)}</p>
+          </div>
+          <div>
+            <p className="text-white/50 text-xs mb-1">Meta Anual</p>
+            <p className="text-white font-semibold">{formatValue(target)}</p>
+          </div>
+          <div>
+            <p className="text-white/50 text-xs mb-1">Avance</p>
+            <p className="font-semibold" style={{ color: progressColor }}>
+              {percent.toFixed(1)}%
+            </p>
+          </div>
+          <div>
+            <p className="text-white/50 text-xs mb-1">Proyección Anual</p>
+            <p className={`font-semibold ${isOnTrack ? 'text-emerald-400' : 'text-amber-400'}`}>
+              {formatValue(projectedAnnual)}
+            </p>
+          </div>
+        </div>
+        
+        {/* Estado del avance */}
+        <div className={`mt-4 flex items-center gap-2 text-sm ${isOnTrack ? 'text-emerald-400' : 'text-amber-400'}`}>
+          {isOnTrack ? (
+            <>
+              <CheckCircle2 size={16} />
+              <span>En camino a cumplir la meta</span>
+            </>
+          ) : (
+            <>
+              <AlertTriangle size={16} />
+              <span>
+                Faltan {formatValue(remaining)} en {monthsRemaining} meses restantes
+              </span>
+            </>
+          )}
+        </div>
+      </motion.div>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-gradient-to-br from-slate-900/80 to-slate-800/60 backdrop-blur-xl rounded-2xl border border-white/10 p-8">
+        <div className="flex items-center justify-center gap-3 text-white/60">
+          <Loader2 className="animate-spin" size={24} />
+          <span>Cargando datos de análisis...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (summaryData.length === 0) {
+    return (
+      <div className="bg-gradient-to-br from-slate-900/80 to-slate-800/60 backdrop-blur-xl rounded-2xl border border-white/10 p-8">
+        <div className="text-center">
+          <BarChart2 size={48} className="text-white/20 mx-auto mb-4" />
+          <h4 className="text-white/60 text-lg mb-2">Sin datos disponibles</h4>
+          <p className="text-white/40 text-sm">
+            Captura datos en la pestaña de Resumen para ver el análisis.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-4">
-      {/* Header con toggle Resumen/Detalle */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-        {/* Toggle de vista */}
-        <div className="flex items-center p-1 bg-white/50 backdrop-blur-sm rounded-2xl border border-white/60 flex-1 sm:flex-none">
-          <button
-            onClick={() => setActiveView('resumen')}
-            className={cn(
-              'flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl',
-              'text-sm font-medium transition-all duration-300',
-              activeView === 'resumen'
-                ? 'bg-gradient-to-r from-plasma-blue to-plasma-indigo text-white shadow-lg shadow-plasma-blue/25'
-                : 'text-soft-slate hover:text-vision-ink'
-            )}
-          >
-            <Sparkles className="size-4" />
-            <span>Resumido</span>
-            {resumenSections.length > 1 && (
-              <span className="ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-white/20">
-                {resumenSections.length}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveView('detalle')}
-            className={cn(
-              'flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl',
-              'text-sm font-medium transition-all duration-300',
-              activeView === 'detalle'
-                ? 'bg-gradient-to-r from-plasma-blue to-plasma-indigo text-white shadow-lg shadow-plasma-blue/25'
-                : 'text-soft-slate hover:text-vision-ink'
-            )}
-          >
-            <Layers className="size-4" />
-            <span>Detallado</span>
-            {detalleSections.length > 1 && (
-              <span className="ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-white/20">
-                {detalleSections.length}
-              </span>
-            )}
-          </button>
-        </div>
-
-        {/* Controles */}
-        <div className="flex items-center gap-2 ml-auto">
-          {/* Selector de año */}
-          <div className="relative">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-gradient-to-br from-slate-900/80 to-slate-800/60 backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden"
+    >
+      {/* Header con selector de año y vistas */}
+      <div className="p-4 md:p-6 border-b border-white/10">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/30">
+              <BarChart2 className="text-emerald-400" size={22} />
+            </div>
+            <div>
+              <h3 className="text-white font-semibold text-lg">Panel de Análisis</h3>
+              <p className="text-white/50 text-sm">Comparativas y tendencias de {metricLabel}</p>
+            </div>
+          </div>
+          
+          {/* Selector de año con z-index alto */}
+          <div className="relative z-50">
             <button
-              onClick={() => setShowYearFilter(!showYearFilter)}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/50 border border-white/60 text-sm font-medium text-vision-ink hover:bg-white/70 transition-all"
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/15 
+                       rounded-xl border border-white/20 transition-all duration-200 min-w-[140px]"
             >
-              <Calendar className="size-4 text-plasma-blue" />
-              <span>{selectedYear === 'all' ? 'Todos' : selectedYear}</span>
-              <ChevronDown className={cn('size-4 transition-transform', showYearFilter && 'rotate-180')} />
+              <Calendar size={16} className="text-emerald-400" />
+              <span className="text-white font-medium">{selectedYear || 'Año'}</span>
+              <ChevronDown 
+                size={16} 
+                className={`text-white/60 ml-auto transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} 
+              />
             </button>
             
             <AnimatePresence>
-              {showYearFilter && (
+              {isDropdownOpen && (
                 <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="absolute top-full left-0 mt-2 z-20 glass-panel rounded-xl border border-white/60 shadow-xl overflow-hidden min-w-[140px]"
+                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute right-0 mt-2 w-full min-w-[140px] bg-slate-800/95 backdrop-blur-xl 
+                           rounded-xl border border-white/20 shadow-2xl overflow-hidden z-[100]"
                 >
-                  {yearOptions.map((option) => (
+                  {availableYears.map((year: number) => (
                     <button
-                      key={option.value}
+                      key={year}
                       onClick={() => {
-                        setSelectedYear(option.value)
-                        setShowYearFilter(false)
+                        setSelectedYear(year);
+                        setIsDropdownOpen(false);
                       }}
-                      className={cn(
-                        'w-full px-4 py-2.5 text-sm text-left transition-all',
-                        option.value === selectedYear
-                          ? 'bg-plasma-blue/10 text-plasma-blue font-semibold'
-                          : 'text-vision-ink hover:bg-white/50'
-                      )}
+                      className={`w-full px-4 py-2.5 text-left transition-all duration-150
+                                ${selectedYear === year 
+                                  ? 'bg-emerald-500/20 text-emerald-400' 
+                                  : 'text-white/80 hover:bg-white/10'}`}
                     >
-                      {option.label}
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-2 h-2 rounded-full" 
+                          style={{ backgroundColor: yearColors[year] }}
+                        />
+                        {year}
+                      </div>
                     </button>
                   ))}
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
+        </div>
 
-          {/* Tipo de gráfica */}
-          <div className="flex items-center p-1 bg-white/50 rounded-xl border border-white/60">
-            {[
-              { type: 'area' as ChartType, icon: BarChart3 },
-              { type: 'bar' as ChartType, icon: BarChart3 },
-              { type: 'line' as ChartType, icon: LineChartIcon },
-            ].map(({ type, icon: Icon }) => (
-              <button
-                key={type}
-                onClick={() => setChartType(type)}
-                className={cn(
-                  'p-2 rounded-lg transition-all',
-                  chartType === type
-                    ? 'bg-plasma-blue text-white shadow-sm'
-                    : 'text-soft-slate hover:text-vision-ink'
-                )}
-              >
-                <Icon className="size-4" />
-              </button>
-            ))}
-          </div>
+        {/* Tabs de vista */}
+        <div className="flex flex-wrap gap-2 mt-4">
+          {[
+            { id: 'overview', label: 'Resumen', icon: Activity },
+            { id: 'monthly', label: 'Mensual', icon: Calendar },
+            { id: 'accumulated', label: 'Acumulado', icon: TrendingUp },
+            { id: 'annual', label: 'Meta Anual', icon: Target }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveView(tab.id as typeof activeView)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200
+                        ${activeView === tab.id 
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                          : 'text-white/60 hover:text-white hover:bg-white/10 border border-transparent'}`}
+            >
+              <tab.icon size={16} />
+              <span className="hidden sm:inline">{tab.label}</span>
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Navegador de Secciones (solo si hay más de 1) */}
-      {activeSections.length > 1 && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass-panel rounded-2xl p-3 border border-plasma-blue/20 bg-gradient-to-r from-plasma-blue/5 via-transparent to-plasma-indigo/5"
-        >
-          <div className="flex items-center justify-between">
-            {/* Botón anterior */}
-            <button
-              onClick={goToPrevSection}
-              disabled={activeIndex === 0}
-              className={cn(
-                'p-2 rounded-xl transition-all',
-                activeIndex === 0
-                  ? 'opacity-30 cursor-not-allowed'
-                  : 'hover:bg-white/50 text-plasma-blue'
-              )}
-            >
-              <ChevronLeft className="size-5" />
-            </button>
-
-            {/* Indicadores de sección */}
-            <div className="flex-1 mx-4">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                {activeSections.map((section, idx) => (
-                  <button
-                    key={section.id}
-                    onClick={() => setActiveIndex(idx)}
-                    className={cn(
-                      'w-2.5 h-2.5 rounded-full transition-all duration-300',
-                      idx === activeIndex
-                        ? 'bg-gradient-to-r from-plasma-blue to-plasma-indigo scale-125'
-                        : 'bg-soft-slate/30 hover:bg-soft-slate/50'
-                    )}
-                    aria-label={`Ir a ${section.title}`}
-                  />
-                ))}
-              </div>
-              <p className="text-center text-sm font-semibold text-vision-ink truncate">
-                {currentSection?.title || 'Cargando...'}
-              </p>
-              <p className="text-center text-xs text-soft-slate mt-0.5">
-                Sección {activeIndex + 1} de {activeSections.length}
-              </p>
-            </div>
-
-            {/* Botón siguiente */}
-            <button
-              onClick={goToNextSection}
-              disabled={activeIndex === activeSections.length - 1}
-              className={cn(
-                'p-2 rounded-xl transition-all',
-                activeIndex === activeSections.length - 1
-                  ? 'opacity-30 cursor-not-allowed'
-                  : 'hover:bg-white/50 text-plasma-blue'
-              )}
-            >
-              <ChevronRight className="size-5" />
-            </button>
-          </div>
-        </motion.div>
-      )}
-
-      {/* Nuevo Dashboard de Métricas Ejecutivo */}
-      {metricsData && activeView === 'resumen' && (
-        <KpiMetricsCards data={metricsData} loading={loading} />
-      )}
-
-      {/* Gráfica principal */}
-      <motion.div
-        layout
-        className="glass-panel rounded-3xl p-4 sm:p-6 border border-white/60 overflow-hidden"
-      >
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-sm font-semibold text-vision-ink">
-              {currentSection?.title || (activeView === 'resumen' ? 'Tendencia de Resumen' : 'Tendencia de Detalle')}
-            </h3>
-            <p className="text-xs text-soft-slate mt-0.5">
-              Evolución {selectedYear === 'all' ? 'histórica' : `mensual • ${selectedYear}`}
-            </p>
-            {/* Info de última carga para detalles */}
-            {activeView === 'detalle' && currentSection?.lastUploadInfo && (
-              <div className="flex items-center gap-2 mt-2 px-2 py-1 bg-plasma-blue/5 rounded-lg border border-plasma-blue/20">
-                <div className="w-2 h-2 rounded-full bg-plasma-blue animate-pulse" />
-                <span className="text-xs text-plasma-blue font-medium">
-                  Última carga: {currentSection.lastUploadInfo.date} • {currentSection.lastUploadInfo.count} registros
-                </span>
-              </div>
-            )}
-          </div>
-          
-          {loading && (
-            <RefreshCw className="size-4 text-plasma-blue animate-spin" />
-          )}
-        </div>
-
+      {/* Contenido principal */}
+      <div className="p-4 md:p-6">
         <AnimatePresence mode="wait">
-          <motion.div
-            key={`${activeView}-${chartType}-${selectedYear}-${activeIndex}`}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            {renderChart()}
-          </motion.div>
+          {activeView === 'overview' && latestMetrics && (
+            <motion.div
+              key="overview"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="space-y-6"
+            >
+              {/* Métricas principales */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Valor actual */}
+                <div className="bg-gradient-to-br from-emerald-500/10 to-teal-500/5 backdrop-blur-sm rounded-xl p-5 border border-emerald-500/20">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-white/60 text-sm">{metricLabel} - {latestMetrics.monthName}</span>
+                    <Clock size={16} className="text-emerald-400" />
+                  </div>
+                  <p className="text-3xl font-bold text-white mb-2">{formatValue(latestMetrics.current)}</p>
+                  {Object.keys(latestMetrics.previousYearComparisons).length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-white/40 text-xs">vs año anterior:</span>
+                      {renderTrend(Object.values(latestMetrics.previousYearComparisons)[0].changePercent)}
+                    </div>
+                  )}
+                </div>
+
+                {/* Acumulado */}
+                <div className="bg-gradient-to-br from-indigo-500/10 to-purple-500/5 backdrop-blur-sm rounded-xl p-5 border border-indigo-500/20">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-white/60 text-sm">Acumulado {selectedYear}</span>
+                    <TrendingUp size={16} className="text-indigo-400" />
+                  </div>
+                  <p className="text-3xl font-bold text-white mb-2">{formatValue(latestMetrics.accumulated)}</p>
+                  {Object.keys(latestMetrics.accumulatedComparisons).length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-white/40 text-xs">vs año anterior:</span>
+                      {renderTrend(Object.values(latestMetrics.accumulatedComparisons)[0].changePercent)}
+                    </div>
+                  )}
+                </div>
+
+                {/* Meta anual */}
+                {latestMetrics.metaProgress && (
+                  <div className="bg-gradient-to-br from-amber-500/10 to-orange-500/5 backdrop-blur-sm rounded-xl p-5 border border-amber-500/20">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-white/60 text-sm">Avance Meta Anual</span>
+                      <Target size={16} className="text-amber-400" />
+                    </div>
+                    <p className="text-3xl font-bold text-white mb-2">
+                      {latestMetrics.metaProgress.percent.toFixed(1)}%
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-white/40 text-xs">Meta:</span>
+                      <span className="text-white/70 text-sm">{formatValue(latestMetrics.metaProgress.target)}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Comparativas con años anteriores */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {renderComparisonCard(
+                  `Comparativa Mensual (${latestMetrics.monthName})`,
+                  latestMetrics.previousYearComparisons,
+                  formatValue
+                )}
+                {renderComparisonCard(
+                  'Comparativa Acumulado',
+                  latestMetrics.accumulatedComparisons,
+                  formatValue
+                )}
+              </div>
+
+              {/* Gráfica de tendencia */}
+              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
+                <h4 className="text-white/80 text-sm mb-4">Tendencia Mensual por Año</h4>
+                <div className="h-64 md:h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={monthlyChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <defs>
+                        {availableYears.map((year: number) => (
+                          <linearGradient key={year} id={`gradient-${year}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor={yearColors[year]} stopOpacity={0.3} />
+                            <stop offset="95%" stopColor={yearColors[year]} stopOpacity={0} />
+                          </linearGradient>
+                        ))}
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                      <XAxis dataKey="mes" stroke="rgba(255,255,255,0.5)" fontSize={12} />
+                      <YAxis stroke="rgba(255,255,255,0.5)" fontSize={12} tickFormatter={(v: number) => formatValue(v)} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                          border: '1px solid rgba(255,255,255,0.2)',
+                          borderRadius: '12px',
+                          boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
+                        }}
+                        labelStyle={{ color: 'white', fontWeight: 'bold' }}
+                        formatter={(value: number, name: string) => {
+                          const year = name.split('_')[1];
+                          return [formatValue(value), year];
+                        }}
+                      />
+                      <Legend 
+                        formatter={(value: string) => {
+                          const year = value.split('_')[1];
+                          return <span style={{ color: yearColors[Number(year)] }}>{year}</span>;
+                        }}
+                      />
+                      {[...availableYears].sort((a, b) => a - b).map((year: number) => (
+                        <Area
+                          key={year}
+                          type="monotone"
+                          dataKey={`valor_${year}`}
+                          stroke={yearColors[year]}
+                          fill={`url(#gradient-${year})`}
+                          strokeWidth={year === selectedYear ? 3 : 1.5}
+                          dot={year === selectedYear}
+                          activeDot={{ r: 6, strokeWidth: 2, fill: yearColors[year] }}
+                        />
+                      ))}
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {activeView === 'monthly' && (
+            <motion.div
+              key="monthly"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="space-y-6"
+            >
+              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
+                <h4 className="text-white/80 text-sm mb-4">Comparativa Mensual por Año</h4>
+                <div className="h-80 md:h-96">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={monthlyChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                      <XAxis dataKey="mes" stroke="rgba(255,255,255,0.5)" fontSize={12} />
+                      <YAxis stroke="rgba(255,255,255,0.5)" fontSize={12} tickFormatter={(v: number) => formatValue(v)} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                          border: '1px solid rgba(255,255,255,0.2)',
+                          borderRadius: '12px',
+                          boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
+                        }}
+                        labelStyle={{ color: 'white', fontWeight: 'bold' }}
+                        formatter={(value: number, name: string) => {
+                          const year = name.split('_')[1];
+                          return [formatValue(value), year];
+                        }}
+                      />
+                      <Legend 
+                        formatter={(value: string) => {
+                          const year = value.split('_')[1];
+                          return <span style={{ color: yearColors[Number(year)] }}>{year}</span>;
+                        }}
+                      />
+                      {[...availableYears].sort((a, b) => a - b).map((year: number) => (
+                        <Bar
+                          key={year}
+                          dataKey={`valor_${year}`}
+                          fill={yearColors[year]}
+                          radius={[4, 4, 0, 0]}
+                          opacity={year === selectedYear ? 1 : 0.6}
+                        />
+                      ))}
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Tabla de comparación */}
+              <div className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-white/5">
+                        <th className="text-left text-white/60 p-3 font-medium">Mes</th>
+                        {[...availableYears].sort((a, b) => b - a).map((year: number) => (
+                          <th key={year} className="text-right text-white/60 p-3 font-medium">
+                            <div className="flex items-center justify-end gap-2">
+                              <div 
+                                className="w-2 h-2 rounded-full" 
+                                style={{ backgroundColor: yearColors[year] }}
+                              />
+                              {year}
+                            </div>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {monthlyChartData.map((row, index) => (
+                        <tr key={index} className="border-t border-white/5 hover:bg-white/5 transition-colors">
+                          <td className="p-3 text-white/80">{String(row.mes)}</td>
+                          {[...availableYears].sort((a, b) => b - a).map((year: number) => {
+                            const value = row[`valor_${year}`] as number | null;
+                            return (
+                              <td key={year} className="p-3 text-right text-white/70">
+                                {value !== null ? formatValue(value) : '-'}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {activeView === 'accumulated' && (
+            <motion.div
+              key="accumulated"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="space-y-6"
+            >
+              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
+                <h4 className="text-white/80 text-sm mb-4">Acumulado Anual por Mes</h4>
+                <div className="h-80 md:h-96">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={accumulatedChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                      <XAxis dataKey="mes" stroke="rgba(255,255,255,0.5)" fontSize={12} />
+                      <YAxis stroke="rgba(255,255,255,0.5)" fontSize={12} tickFormatter={(v: number) => formatValue(v)} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                          border: '1px solid rgba(255,255,255,0.2)',
+                          borderRadius: '12px',
+                          boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
+                        }}
+                        labelStyle={{ color: 'white', fontWeight: 'bold' }}
+                        formatter={(value: number, name: string) => {
+                          if (name === 'meta_anual') return [formatValue(value), 'Meta Anual'];
+                          const year = name.split('_')[1];
+                          return [formatValue(value), `Acumulado ${year}`];
+                        }}
+                      />
+                      <Legend 
+                        formatter={(value: string) => {
+                          if (value === 'meta_anual') return <span style={{ color: '#f59e0b' }}>Meta Anual</span>;
+                          const year = value.split('_')[1];
+                          return <span style={{ color: yearColors[Number(year)] }}>Acumulado {year}</span>;
+                        }}
+                      />
+                      {metaAnual && (
+                        <Line
+                          type="monotone"
+                          dataKey="meta_anual"
+                          stroke="#f59e0b"
+                          strokeWidth={2}
+                          strokeDasharray="8 4"
+                          dot={false}
+                        />
+                      )}
+                      {[...availableYears].sort((a, b) => a - b).map((year: number) => (
+                        <Line
+                          key={year}
+                          type="monotone"
+                          dataKey={`acumulado_${year}`}
+                          stroke={yearColors[year]}
+                          strokeWidth={year === selectedYear ? 3 : 1.5}
+                          dot={year === selectedYear}
+                          activeDot={{ r: 6, strokeWidth: 2, fill: yearColors[year] }}
+                        />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Tabla de acumulados */}
+              <div className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-white/5">
+                        <th className="text-left text-white/60 p-3 font-medium">Mes</th>
+                        {[...availableYears].sort((a, b) => b - a).map((year: number) => (
+                          <th key={year} className="text-right text-white/60 p-3 font-medium">
+                            <div className="flex items-center justify-end gap-2">
+                              <div 
+                                className="w-2 h-2 rounded-full" 
+                                style={{ backgroundColor: yearColors[year] }}
+                              />
+                              Acum. {year}
+                            </div>
+                          </th>
+                        ))}
+                        {metaAnual && (
+                          <th className="text-right text-amber-400/80 p-3 font-medium">Meta Anual</th>
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {accumulatedChartData.map((row, index) => (
+                        <tr key={index} className="border-t border-white/5 hover:bg-white/5 transition-colors">
+                          <td className="p-3 text-white/80">{String(row.mes)}</td>
+                          {[...availableYears].sort((a, b) => b - a).map((year: number) => {
+                            const value = row[`acumulado_${year}`] as number | null;
+                            return (
+                              <td key={year} className="p-3 text-right text-white/70">
+                                {value !== null ? formatValue(value) : '-'}
+                              </td>
+                            );
+                          })}
+                          {metaAnual && (
+                            <td className="p-3 text-right text-amber-400/70">
+                              {formatValue(metaAnual)}
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {activeView === 'annual' && (
+            <motion.div
+              key="annual"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="space-y-6"
+            >
+              {renderMetaProgress()}
+              
+              {!latestMetrics?.metaProgress && (
+                <div className="bg-white/5 backdrop-blur-sm rounded-xl p-8 border border-white/10 text-center">
+                  <Target size={48} className="text-white/20 mx-auto mb-4" />
+                  <h4 className="text-white/60 text-lg mb-2">Sin Meta Anual Definida</h4>
+                  <p className="text-white/40 text-sm">
+                    Configura la meta anual en el formulario de resumen para ver el progreso.
+                  </p>
+                </div>
+              )}
+
+              {latestMetrics?.metaProgress && (
+                <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
+                  <h4 className="text-white/80 text-sm mb-4">Proyección vs Meta</h4>
+                  <div className="h-64 md:h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart 
+                        data={[
+                          { 
+                            name: 'Acumulado Actual', 
+                            valor: latestMetrics.metaProgress.current,
+                            fill: '#10b981'
+                          },
+                          { 
+                            name: 'Proyección Anual', 
+                            valor: latestMetrics.metaProgress.projectedAnnual,
+                            fill: '#6366f1'
+                          },
+                          { 
+                            name: 'Meta Anual', 
+                            valor: latestMetrics.metaProgress.target,
+                            fill: '#f59e0b'
+                          }
+                        ]} 
+                        margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                        layout="vertical"
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                        <XAxis type="number" stroke="rgba(255,255,255,0.5)" fontSize={12} tickFormatter={(v: number) => formatValue(v)} />
+                        <YAxis type="category" dataKey="name" stroke="rgba(255,255,255,0.5)" fontSize={12} width={120} />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                            border: '1px solid rgba(255,255,255,0.2)',
+                            borderRadius: '12px',
+                            boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
+                          }}
+                          labelStyle={{ color: 'white', fontWeight: 'bold' }}
+                          formatter={(value: number) => [formatValue(value), 'Valor']}
+                        />
+                        <Bar dataKey="valor" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          )}
         </AnimatePresence>
 
-        {/* Leyenda */}
-        {dataKeys.length > 0 && (
-          <div className="flex flex-wrap items-center justify-center gap-4 mt-4 pt-4 border-t border-white/40">
-            {dataKeys.map((key, i) => (
-              <div key={key} className="flex items-center gap-2">
-                <div
-                  className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: PIE_COLORS[i] }}
-                />
-                <span className="text-xs text-soft-slate capitalize">
-                  {key.replace(/_/g, ' ')}
-                </span>
-              </div>
-            ))}
+        {/* Estado vacío */}
+        {!latestMetrics && activeView === 'overview' && (
+          <div className="text-center py-12">
+            <BarChart2 size={48} className="text-white/20 mx-auto mb-4" />
+            <h4 className="text-white/60 text-lg mb-2">Sin datos disponibles</h4>
+            <p className="text-white/40 text-sm">
+              Selecciona un año con datos para ver el análisis.
+            </p>
           </div>
         )}
-      </motion.div>
-    </div>
-  )
+      </div>
+    </motion.div>
+  );
 }
+
+export default KpiAnalysisPanel;

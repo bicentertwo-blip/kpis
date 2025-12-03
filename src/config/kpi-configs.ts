@@ -58,6 +58,33 @@ const campoMetaPorcentaje: FieldDefinition = {
   required: true,
 }
 
+const campoMetaAnual: FieldDefinition = {
+  id: 'meta_anual',
+  label: 'Meta Anual',
+  type: 'currency',
+  placeholder: '$60,000,000',
+  description: 'Meta anual para seguimiento de progreso',
+  required: false,
+}
+
+const campoMetaAnualPorcentaje: FieldDefinition = {
+  id: 'meta_anual',
+  label: 'Meta Anual (%)',
+  type: 'percentage',
+  placeholder: '95',
+  description: 'Meta anual para seguimiento de progreso',
+  required: false,
+}
+
+const campoMetaAnualNumero: FieldDefinition = {
+  id: 'meta_anual',
+  label: 'Meta Anual',
+  type: 'number',
+  placeholder: '100',
+  description: 'Meta anual para seguimiento de progreso',
+  required: false,
+}
+
 // Nota: campoRegion se usa en configuraciones que requieren región
 const _campoRegion: FieldDefinition = {
   id: 'region',
@@ -99,6 +126,7 @@ export const MARGEN_FINANCIERO_CONFIG: KpiDefinition = {
           required: true,
         },
         campoMeta,
+        campoMetaAnual,
       ],
     },
   ],
@@ -142,6 +170,7 @@ export const INDICE_RENOVACION_CONFIG: KpiDefinition = {
           required: true,
         },
         campoMetaPorcentaje,
+        campoMetaAnualPorcentaje,
       ],
     },
   ],
@@ -206,6 +235,14 @@ export const ROE_ROA_CONFIG: KpiDefinition = {
           placeholder: '3',
           required: true,
         },
+        {
+          id: 'meta_anual',
+          label: 'Meta Anual ROE (%)',
+          type: 'percentage',
+          placeholder: '22',
+          description: 'Meta anual de ROE para seguimiento de progreso',
+          required: false,
+        },
       ],
     },
   ],
@@ -248,6 +285,7 @@ export const COLOCACION_CONFIG: KpiDefinition = {
           required: true,
         },
         campoMeta,
+        campoMetaAnual,
       ],
     },
     {
@@ -267,6 +305,7 @@ export const COLOCACION_CONFIG: KpiDefinition = {
           required: true,
         },
         campoMetaPorcentaje,
+        campoMetaAnualPorcentaje,
       ],
     },
     {
@@ -299,6 +338,7 @@ export const COLOCACION_CONFIG: KpiDefinition = {
           required: true,
         },
         campoMetaPorcentaje,
+        campoMetaAnualPorcentaje,
       ],
     },
   ],
@@ -355,6 +395,7 @@ export const RENTABILIDAD_CONFIG: KpiDefinition = {
           required: true,
         },
         campoMeta,
+        campoMetaAnual,
       ],
     },
     {
@@ -373,6 +414,7 @@ export const RENTABILIDAD_CONFIG: KpiDefinition = {
           required: true,
         },
         campoMeta,
+        campoMetaAnual,
       ],
     },
     {
@@ -391,6 +433,7 @@ export const RENTABILIDAD_CONFIG: KpiDefinition = {
           required: true,
         },
         campoMeta,
+        campoMetaAnual,
       ],
     },
     {
@@ -409,6 +452,7 @@ export const RENTABILIDAD_CONFIG: KpiDefinition = {
           required: true,
         },
         campoMeta,
+        campoMetaAnual,
       ],
     },
   ],
@@ -472,6 +516,7 @@ export const ROTACION_PERSONAL_CONFIG: KpiDefinition = {
           required: true,
         },
         campoMetaPorcentaje,
+        campoMetaAnualPorcentaje,
       ],
     },
     {
@@ -491,6 +536,7 @@ export const ROTACION_PERSONAL_CONFIG: KpiDefinition = {
           required: true,
         },
         campoMeta,
+        campoMetaAnualNumero,
       ],
     },
     {
@@ -509,6 +555,7 @@ export const ROTACION_PERSONAL_CONFIG: KpiDefinition = {
           required: true,
         },
         campoMetaPorcentaje,
+        campoMetaAnualPorcentaje,
       ],
     },
     {
@@ -527,6 +574,7 @@ export const ROTACION_PERSONAL_CONFIG: KpiDefinition = {
           required: true,
         },
         campoMetaPorcentaje,
+        campoMetaAnualPorcentaje,
       ],
     },
   ],
@@ -590,6 +638,7 @@ export const ESCALABILIDAD_CONFIG: KpiDefinition = {
           required: true,
         },
         campoMetaPorcentaje,
+        campoMetaAnualPorcentaje,
       ],
     },
     {
@@ -608,6 +657,7 @@ export const ESCALABILIDAD_CONFIG: KpiDefinition = {
           required: true,
         },
         campoMetaPorcentaje,
+        campoMetaAnualPorcentaje,
       ],
     },
     {
@@ -626,6 +676,7 @@ export const ESCALABILIDAD_CONFIG: KpiDefinition = {
           required: true,
         },
         campoMeta,
+        campoMetaAnual,
       ],
     },
   ],
@@ -682,6 +733,7 @@ export const POSICIONAMIENTO_MARCA_CONFIG: KpiDefinition = {
           required: true,
         },
         campoMetaPorcentaje,
+        campoMetaAnualPorcentaje,
       ],
     },
     {
@@ -701,6 +753,7 @@ export const POSICIONAMIENTO_MARCA_CONFIG: KpiDefinition = {
           required: true,
         },
         campoMeta,
+        campoMetaAnualNumero,
       ],
     },
     {
@@ -722,6 +775,7 @@ export const POSICIONAMIENTO_MARCA_CONFIG: KpiDefinition = {
           max: 100,
         },
         campoMeta,
+        campoMetaAnualNumero,
       ],
     },
   ],
@@ -797,6 +851,7 @@ export const INNOVACION_CONFIG: KpiDefinition = {
           type: 'long-text',
           placeholder: 'Principales aprendizajes del período...',
         },
+        campoMetaAnualNumero,
       ],
     },
   ],
@@ -841,6 +896,7 @@ export const SATISFACCION_CONFIG: KpiDefinition = {
           required: true,
         },
         campoMeta,
+        campoMetaAnualNumero,
       ],
     },
     {
@@ -859,6 +915,7 @@ export const SATISFACCION_CONFIG: KpiDefinition = {
           required: true,
         },
         campoMetaPorcentaje,
+        campoMetaAnualPorcentaje,
       ],
     },
     {
@@ -877,6 +934,7 @@ export const SATISFACCION_CONFIG: KpiDefinition = {
           required: true,
         },
         campoMetaPorcentaje,
+        campoMetaAnualPorcentaje,
       ],
     },
   ],
@@ -933,6 +991,7 @@ export const CUMPLIMIENTO_CONFIG: KpiDefinition = {
           required: true,
         },
         campoMetaPorcentaje,
+        campoMetaAnualPorcentaje,
       ],
     },
     {
@@ -952,6 +1011,7 @@ export const CUMPLIMIENTO_CONFIG: KpiDefinition = {
           required: true,
         },
         campoMeta,
+        campoMetaAnualNumero,
       ],
     },
   ],
@@ -1006,6 +1066,7 @@ export const GESTION_RIESGOS_CONFIG: KpiDefinition = {
           type: 'long-text',
           placeholder: 'Principales acciones de mitigación...',
         },
+        campoMetaAnualNumero,
       ],
     },
   ],
@@ -1067,6 +1128,7 @@ export const GOBIERNO_CORPORATIVO_CONFIG: KpiDefinition = {
           type: 'long-text',
           placeholder: 'Notas relevantes del período...',
         },
+        campoMetaAnualPorcentaje,
       ],
     },
   ],
