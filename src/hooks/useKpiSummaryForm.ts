@@ -31,11 +31,13 @@ interface UseKpiSummaryFormReturn extends UseKpiSummaryFormState {
   replaceForm: (values: Record<string, unknown>) => void
   saveAndClear: () => Promise<boolean>
   saveNow: () => Promise<boolean>
+  updateMetaAnualOnly: () => Promise<boolean>
   resetForm: () => void
   getFieldValue: <T>(fieldId: string, defaultValue?: T) => T
   isFieldValid: (field: FieldDefinition) => boolean
   getFormProgress: () => { filled: number; total: number; percentage: number }
   canSave: boolean
+  canSaveMetaAnual: boolean
 }
 
 export const useKpiSummaryForm = (
@@ -221,6 +223,68 @@ export const useKpiSummaryForm = (
     return await persistData(state.formValues)
   }, [persistData, state.formValues])
 
+  // Actualizar SOLO meta_anual en todos los registros del año
+  // Esta función hace UPDATE en lugar de INSERT
+  const updateMetaAnualOnly = useCallback(async (): Promise<boolean> => {
+    if (!userId) return false
+
+    const anio = state.formValues['anio']
+    const metaAnual = state.formValues['meta_anual']
+
+    if (!anio || metaAnual === undefined || metaAnual === null || metaAnual === '') {
+      setState((prev) => ({ ...prev, error: 'Debe especificar el año y la meta anual' }))
+      return false
+    }
+
+    setState((prev) => ({ ...prev, saving: true, error: null, saveSuccess: false }))
+
+    try {
+      const metaAnualValue = parseFloat(String(metaAnual).replace(/[$%,]/g, ''))
+
+      // UPDATE: Actualizar meta_anual en todos los registros del año
+      const { error } = await supabase
+        .from(section.tableName)
+        .update({ 
+          meta_anual: metaAnualValue,
+          updated_at: new Date().toISOString()
+        })
+        .eq('anio', anio)
+        .eq('is_current', true)
+
+      if (error) {
+        setState((prev) => ({ ...prev, saving: false, error: error.message, saveSuccess: false }))
+        return false
+      }
+
+      setState((prev) => ({
+        ...prev,
+        saving: false,
+        lastSavedAt: new Date().toISOString(),
+        error: null,
+        isDirty: false,
+        saveSuccess: true,
+        // Limpiar solo el campo meta_anual, mantener el resto
+        formValues: { ...prev.formValues, meta_anual: '' }
+      }))
+
+      // Resetear el flag de éxito después de 3 segundos
+      if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current)
+      successTimeoutRef.current = setTimeout(() => {
+        setState((prev) => ({ ...prev, saveSuccess: false }))
+      }, 3000)
+
+      return true
+    } catch (err) {
+      setState((prev) => ({
+        ...prev,
+        saving: false,
+        error: (err as Error).message,
+        saveSuccess: false,
+      }))
+      return false
+    }
+  }, [section.tableName, state.formValues, userId])
+
   // Resetear formulario
   const resetForm = useCallback(() => {
     setState((prev) => ({
@@ -291,16 +355,28 @@ export const useKpiSummaryForm = (
     })
   }, [section.fields, state.formValues])
 
+  // Verificar si se puede guardar solo Meta Anual (año + meta_anual tienen valor)
+  const canSaveMetaAnual = useMemo(() => {
+    const anio = state.formValues['anio']
+    const metaAnual = state.formValues['meta_anual']
+    return (
+      anio !== undefined && anio !== null && anio !== '' &&
+      metaAnual !== undefined && metaAnual !== null && metaAnual !== ''
+    )
+  }, [state.formValues])
+
   return {
     ...state,
     updateField,
     replaceForm,
     saveAndClear,
     saveNow,
+    updateMetaAnualOnly,
     resetForm,
     getFieldValue,
     isFieldValid,
     getFormProgress,
     canSave,
+    canSaveMetaAnual,
   }
 }

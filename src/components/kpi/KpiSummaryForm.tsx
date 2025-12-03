@@ -6,7 +6,7 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Hash, DollarSign, Percent, Type, AlignLeft, ChevronDown, Check, Save, RotateCcw, Loader2, CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react'
+import { Hash, DollarSign, Percent, Type, AlignLeft, ChevronDown, Check, Save, RotateCcw, Loader2, CheckCircle2, AlertCircle, AlertTriangle, Target } from 'lucide-react'
 import type { SectionDefinition, FieldDefinition } from '@/types/kpi-definitions'
 import { useKpiSummaryForm } from '@/hooks/useKpiSummaryForm'
 import { cn } from '@/utils/ui'
@@ -44,7 +44,7 @@ const fieldTypeConfig: Record<FieldDefinition['type'], { icon: React.ReactNode; 
 }
 
 export const KpiSummaryForm = ({ section, filters }: KpiSummaryFormProps) => {
-  const [showConfirmation, setShowConfirmation] = useState(false)
+  const [showMetaAnualConfirmation, setShowMetaAnualConfirmation] = useState(false)
   
   const {
     formValues,
@@ -56,42 +56,33 @@ export const KpiSummaryForm = ({ section, filters }: KpiSummaryFormProps) => {
     isFieldValid,
     getFormProgress,
     saveAndClear,
+    updateMetaAnualOnly,
     resetForm,
     canSave,
+    canSaveMetaAnual,
     isDirty,
   } = useKpiSummaryForm(section, filters)
 
   const progress = getFormProgress()
-  
-  // Detectar si es un guardado de solo Meta Anual (sin datos mensuales)
-  const isMetaAnualOnlyMode = (): boolean => {
-    const hasMetaAnual = formValues['meta_anual'] !== undefined && 
-                          formValues['meta_anual'] !== null && 
-                          formValues['meta_anual'] !== ''
-    const hasMes = formValues['mes'] !== undefined && 
-                   formValues['mes'] !== null && 
-                   formValues['mes'] !== ''
-    
-    // Si tiene meta_anual pero NO tiene mes, es modo solo meta anual
-    return hasMetaAnual && !hasMes
-  }
 
+  // Guardar datos mensuales normales (INSERT)
   const handleSave = async () => {
-    // Si es modo solo meta anual, pedir confirmación
-    if (isMetaAnualOnlyMode()) {
-      setShowConfirmation(true)
-      return
-    }
     await saveAndClear()
   }
   
-  const handleConfirmSave = async () => {
-    setShowConfirmation(false)
-    await saveAndClear()
+  // Mostrar confirmación para actualizar solo Meta Anual
+  const handleMetaAnualClick = () => {
+    setShowMetaAnualConfirmation(true)
+  }
+  
+  // Confirmar actualización de Meta Anual (UPDATE)
+  const handleConfirmMetaAnual = async () => {
+    setShowMetaAnualConfirmation(false)
+    await updateMetaAnualOnly()
   }
   
   const handleCancelConfirmation = () => {
-    setShowConfirmation(false)
+    setShowMetaAnualConfirmation(false)
   }
 
   const renderField = (field: FieldDefinition) => {
@@ -381,7 +372,36 @@ export const KpiSummaryForm = ({ section, filters }: KpiSummaryFormProps) => {
           <span>Limpiar</span>
         </button>
 
-        {/* Botón Guardar */}
+        {/* Botón Actualizar Meta Anual - Solo visible si tiene año y meta_anual */}
+        {canSaveMetaAnual && !canSave && (
+          <button
+            type="button"
+            onClick={handleMetaAnualClick}
+            disabled={saving}
+            className={cn(
+              'flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl',
+              'bg-gradient-to-r from-amber-500 to-orange-500',
+              'text-sm font-medium text-white',
+              'hover:shadow-lg hover:scale-[1.02]',
+              'disabled:opacity-40 disabled:cursor-not-allowed',
+              'transition-all duration-200'
+            )}
+          >
+            {saving ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                <span>Actualizando...</span>
+              </>
+            ) : (
+              <>
+                <Target className="size-4" />
+                <span>Actualizar Meta Anual</span>
+              </>
+            )}
+          </button>
+        )}
+
+        {/* Botón Guardar - Requiere todos los campos obligatorios */}
         <button
           type="button"
           onClick={handleSave}
@@ -410,7 +430,7 @@ export const KpiSummaryForm = ({ section, filters }: KpiSummaryFormProps) => {
       </motion.div>
 
       {/* Modal de Confirmación para Meta Anual */}
-      {showConfirmation && (
+      {showMetaAnualConfirmation && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -435,18 +455,18 @@ export const KpiSummaryForm = ({ section, filters }: KpiSummaryFormProps) => {
             {/* Título y mensaje */}
             <div className="text-center mb-6">
               <h3 className="text-lg font-semibold text-vision-ink mb-2">
-                Confirmar Guardado de Meta Anual
+                Actualizar Meta Anual
               </h3>
               <p className="text-sm text-soft-slate leading-relaxed">
-                Estás guardando únicamente la <span className="font-medium text-plasma-blue">Meta Anual</span> para el año <span className="font-medium text-plasma-blue">{String(formValues['anio'] || new Date().getFullYear())}</span>. 
-                Esta acción es poco frecuente y generalmente se realiza una vez al inicio del año.
+                Se actualizará la <span className="font-medium text-plasma-blue">Meta Anual</span> en todos los registros del año <span className="font-medium text-plasma-blue">{String(formValues['anio'] || new Date().getFullYear())}</span>. 
+                Los demás datos mensuales <span className="font-medium text-emerald-600">NO serán modificados</span>.
               </p>
             </div>
 
             {/* Resumen de lo que se guardará */}
             <div className="bg-amber-50/60 rounded-2xl p-4 mb-6 border border-amber-100">
               <p className="text-xs font-medium text-amber-800 uppercase tracking-wide mb-2">
-                Se guardará:
+                Se actualizará:
               </p>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-amber-700">Meta Anual ({String(formValues['anio'] || new Date().getFullYear())})</span>
@@ -476,7 +496,7 @@ export const KpiSummaryForm = ({ section, filters }: KpiSummaryFormProps) => {
               </button>
               <button
                 type="button"
-                onClick={handleConfirmSave}
+                onClick={handleConfirmMetaAnual}
                 disabled={saving}
                 className={cn(
                   'flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl',
@@ -490,12 +510,12 @@ export const KpiSummaryForm = ({ section, filters }: KpiSummaryFormProps) => {
                 {saving ? (
                   <>
                     <Loader2 className="size-4 animate-spin" />
-                    <span>Guardando...</span>
+                    <span>Actualizando...</span>
                   </>
                 ) : (
                   <>
                     <Check className="size-4" />
-                    <span>Sí, Guardar</span>
+                    <span>Sí, Actualizar</span>
                   </>
                 )}
               </button>
