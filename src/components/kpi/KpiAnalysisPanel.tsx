@@ -66,6 +66,15 @@ export function KpiAnalysisPanel({
     return metricField?.type === 'percentage';
   }, [selectedSummary, metricKey]);
 
+  // Determinar tipo de agregación: si tiene aggregationType explícito, usarlo; sino, avg para porcentaje, sum para el resto
+  const shouldSum = useMemo(() => {
+    if (selectedSummary?.aggregationType) {
+      return selectedSummary.aggregationType === 'sum';
+    }
+    // Default: sumar para moneda/número, promediar para porcentaje
+    return !isPercentage;
+  }, [selectedSummary, isPercentage]);
+
   const formatValue = useCallback((v: number): string => {
     if (v === null || v === undefined) return '-';
     if (isPercentage) return `${v.toFixed(2)}%`;
@@ -171,18 +180,18 @@ export function KpiAnalysisPanel({
     });
   }, [dataByYear, availableYears, metricKey]);
 
-  // Función para calcular acumulado (suma para moneda, promedio para porcentaje)
+  // Función para calcular acumulado (suma o promedio según configuración)
   const calculateAccumulated = useCallback((data: SummaryRecord[], upToMonth: number): number => {
     const filtered = data.filter((d: SummaryRecord) => Number(d.mes) <= upToMonth);
     if (filtered.length === 0) return 0;
     
     const sum = filtered.reduce((acc: number, d: SummaryRecord) => acc + (Number(d[metricKey]) || 0), 0);
     
-    // Para porcentajes: promedio; para moneda: suma
-    return isPercentage ? sum / filtered.length : sum;
-  }, [metricKey, isPercentage]);
+    // Usar shouldSum para determinar si sumar o promediar
+    return shouldSum ? sum : sum / filtered.length;
+  }, [metricKey, shouldSum]);
 
-  // Datos acumulados por año (suma para moneda, promedio para porcentaje)
+  // Datos acumulados por año (suma o promedio según configuración)
   const accumulatedChartData = useMemo(() => {
     return MONTH_NAMES.map((month, index) => {
       const monthNum = index + 1;
@@ -247,12 +256,12 @@ export function KpiAnalysisPanel({
     // Progreso hacia meta anual
     let metaProgress = null;
     if (metaAnual && metaAnual > 0) {
-      // Para porcentajes: el acumulado ya es el promedio, comparar directamente con meta
-      // Para moneda: proyectar al año completo
+      // Para valores que se promedian: el acumulado ya es el promedio, comparar directamente con meta
+      // Para valores que se suman: proyectar al año completo
       const percent = (currentAccumulated / metaAnual) * 100;
-      const projectedAnnual = isPercentage 
-        ? currentAccumulated  // Para porcentajes, el promedio actual es la proyección
-        : (latestMonth > 0 ? (currentAccumulated / latestMonth) * 12 : 0);
+      const projectedAnnual = shouldSum 
+        ? (latestMonth > 0 ? (currentAccumulated / latestMonth) * 12 : 0)  // Proyectar proporcionalmente
+        : currentAccumulated;  // Para promedios, el valor actual es la proyección
       
       metaProgress = {
         current: currentAccumulated,
@@ -273,7 +282,7 @@ export function KpiAnalysisPanel({
       accumulatedComparisons,
       metaProgress
     };
-  }, [currentYearData, dataByYear, availableYears, selectedYear, metricKey, metaAnual, calculateAccumulated, isPercentage]);
+  }, [currentYearData, dataByYear, availableYears, selectedYear, metricKey, metaAnual, calculateAccumulated, shouldSum]);
 
   // Colores para años en gráficas - paleta distintiva y vibrante
   const yearColors: Record<number, string> = useMemo(() => {

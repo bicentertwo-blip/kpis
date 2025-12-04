@@ -83,7 +83,7 @@ export const KPI_DASHBOARD_METRICS: KpiDashboardMetric[] = [
     tableName: 'kpi_rotacion_resumen_1',
     metricKey: 'indice_rotacion',
     metaKey: 'meta',
-    aggregationType: 'avg',
+    aggregationType: 'sum', // Rotación se acumula durante el año
     higherIsBetter: false, // Menos rotación es mejor
     format: 'percentage',
     route: '/rotacion-personal',

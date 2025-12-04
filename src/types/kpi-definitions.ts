@@ -48,6 +48,7 @@ export interface SectionDefinition {
   description?: string
   fields: FieldDefinition[]
   tableName: string // Nombre de tabla en Supabase para este resumen
+  aggregationType?: 'sum' | 'avg' // Para acumulados: 'sum' suma, 'avg' promedia (default según tipo de campo)
 }
 
 export interface DetailLayoutDefinition {
