@@ -580,6 +580,7 @@ export const ROTACION_PERSONAL_CONFIG: KpiDefinition = {
       description: 'Índice de rotación mensual',
       tableName: 'kpi_rotacion_resumen_1',
       aggregationType: 'sum', // La rotación se acumula durante el año
+      higherIsBetter: false, // Menos rotación es mejor
       fields: [
         campoAnio,
         campoMes,

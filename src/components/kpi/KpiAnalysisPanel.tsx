@@ -75,6 +75,11 @@ export function KpiAnalysisPanel({
     return !isPercentage;
   }, [selectedSummary, isPercentage]);
 
+  // Determinar si mayor es mejor (para semáforos y progreso)
+  const higherIsBetter = useMemo(() => {
+    return selectedSummary?.higherIsBetter !== false; // Default: true
+  }, [selectedSummary]);
+
   const formatValue = useCallback((v: number): string => {
     if (v === null || v === undefined) return '-';
     if (isPercentage) return `${v.toFixed(2)}%`;
@@ -365,9 +370,16 @@ export function KpiAnalysisPanel({
     if (!latestMetrics?.metaProgress) return null;
     
     const { current, target, percent, remaining, monthsRemaining, projectedAnnual } = latestMetrics.metaProgress;
-    const isOnTrack = projectedAnnual >= target;
-    const progressColor = percent >= 100 ? '#10b981' : percent >= 75 ? '#f59e0b' : percent >= 50 ? '#6366f1' : '#ef4444';
-    const progressBg = percent >= 100 ? 'from-emerald-500 to-teal-500' : percent >= 75 ? 'from-amber-500 to-orange-500' : percent >= 50 ? 'from-indigo-500 to-purple-500' : 'from-rose-500 to-red-500';
+    
+    // isOnTrack depende de si mayor es mejor o no
+    const isOnTrack = higherIsBetter 
+      ? projectedAnnual >= target  // Mayor es mejor: proyección >= meta
+      : projectedAnnual <= target; // Menor es mejor: proyección <= meta
+    
+    // Colores según el avance (invertidos si menor es mejor)
+    const effectivePercent = higherIsBetter ? percent : (target > 0 ? (target / current) * 100 : 0);
+    const progressColor = isOnTrack ? '#10b981' : effectivePercent >= 75 ? '#f59e0b' : '#ef4444';
+    const progressBg = isOnTrack ? 'from-emerald-500 to-teal-500' : effectivePercent >= 75 ? 'from-amber-500 to-orange-500' : 'from-rose-500 to-red-500';
     
     return (
       <motion.div 
@@ -434,7 +446,10 @@ export function KpiAnalysisPanel({
             <>
               <AlertTriangle size={16} />
               <span className="font-medium">
-                Faltan {formatValue(remaining)} en {monthsRemaining} meses restantes
+                {higherIsBetter 
+                  ? `Faltan ${formatValue(Math.abs(remaining))} en ${monthsRemaining} meses restantes`
+                  : `Excede la meta en ${formatValue(Math.abs(remaining))}`
+                }
               </span>
             </>
           )}

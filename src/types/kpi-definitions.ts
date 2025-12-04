@@ -49,6 +49,7 @@ export interface SectionDefinition {
   fields: FieldDefinition[]
   tableName: string // Nombre de tabla en Supabase para este resumen
   aggregationType?: 'sum' | 'avg' // Para acumulados: 'sum' suma, 'avg' promedia (default según tipo de campo)
+  higherIsBetter?: boolean // true = superar meta es positivo, false = estar debajo es positivo (default: true)
 }
 
 export interface DetailLayoutDefinition {
