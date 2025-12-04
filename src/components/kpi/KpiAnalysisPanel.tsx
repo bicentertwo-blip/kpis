@@ -275,9 +275,19 @@ export function KpiAnalysisPanel({
     };
   }, [currentYearData, dataByYear, availableYears, selectedYear, metricKey, metaAnual, calculateAccumulated, isPercentage]);
 
-  // Colores para años en gráficas
+  // Colores para años en gráficas - paleta distintiva y vibrante
   const yearColors: Record<number, string> = useMemo(() => {
-    const palette = ['#10b981', '#6366f1', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+    // Colores bien diferenciados que no se oscurecen al superponerse
+    const palette = [
+      '#059669', // Emerald 600 - año más reciente
+      '#2563eb', // Blue 600
+      '#d97706', // Amber 600
+      '#dc2626', // Red 600
+      '#7c3aed', // Violet 600
+      '#db2777', // Pink 600
+      '#0891b2', // Cyan 600
+      '#65a30d', // Lime 600
+    ];
     const colors: Record<number, string> = {};
     [...availableYears].sort((a, b) => b - a).forEach((year: number, index: number) => {
       colors[year] = palette[index % palette.length];
@@ -685,10 +695,10 @@ export function KpiAnalysisPanel({
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={monthlyChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                       <defs>
-                        {availableYears.map((year: number) => (
+                        {availableYears.map((year: number, idx: number) => (
                           <linearGradient key={year} id={`gradient-${year}`} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={yearColors[year]} stopOpacity={0.4} />
-                            <stop offset="95%" stopColor={yearColors[year]} stopOpacity={0.05} />
+                            <stop offset="5%" stopColor={yearColors[year]} stopOpacity={idx === 0 ? 0.25 : 0.08} />
+                            <stop offset="95%" stopColor={yearColors[year]} stopOpacity={0} />
                           </linearGradient>
                         ))}
                       </defs>
@@ -711,7 +721,7 @@ export function KpiAnalysisPanel({
                       <Legend 
                         formatter={(value: string) => {
                           const year = value.split('_')[1];
-                          return <span style={{ color: yearColors[Number(year)], fontWeight: 500 }}>{year}</span>;
+                          return <span style={{ color: yearColors[Number(year)], fontWeight: 600 }}>{year}</span>;
                         }}
                       />
                       {[...availableYears].sort((a, b) => a - b).map((year: number) => (
@@ -721,7 +731,7 @@ export function KpiAnalysisPanel({
                           dataKey={`valor_${year}`}
                           stroke={yearColors[year]}
                           fill={`url(#gradient-${year})`}
-                          strokeWidth={year === selectedYear ? 3 : 1.5}
+                          strokeWidth={year === selectedYear ? 3 : 2}
                           dot={year === selectedYear}
                           activeDot={{ r: 6, strokeWidth: 2, fill: yearColors[year] }}
                         />
@@ -835,37 +845,46 @@ export function KpiAnalysisPanel({
                 <h4 className="text-vision-ink font-medium text-sm mb-4">Acumulado Anual por Mes</h4>
                 <div className="h-80 md:h-96">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={accumulatedChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.3)" />
+                    <LineChart data={accumulatedChartData} margin={{ top: 20, right: 20, left: 10, bottom: 10 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.25)" />
                       <XAxis dataKey="mes" stroke="#64748b" fontSize={12} />
-                      <YAxis stroke="#64748b" fontSize={12} tickFormatter={(v: number) => formatValue(v)} />
+                      <YAxis 
+                        stroke="#64748b" 
+                        fontSize={11} 
+                        tickFormatter={(v: number) => formatValue(v)}
+                        domain={['auto', 'auto']}
+                        padding={{ top: 20, bottom: 20 }}
+                      />
                       <Tooltip
                         contentStyle={{
                           backgroundColor: 'rgba(255, 255, 255, 0.98)',
                           border: '1px solid rgba(148,163,184,0.3)',
                           borderRadius: '12px',
-                          boxShadow: '0 8px 32px rgba(0,0,0,0.12)'
+                          boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+                          padding: '12px 16px'
                         }}
-                        labelStyle={{ color: '#0f172a', fontWeight: 'bold' }}
+                        labelStyle={{ color: '#0f172a', fontWeight: 'bold', marginBottom: '8px' }}
                         formatter={(value: number, name: string) => {
                           if (name === 'meta_anual') return [formatValue(value), 'Meta Anual'];
                           const year = name.split('_')[1];
-                          return [formatValue(value), `Acumulado ${year}`];
+                          return [formatValue(value), `${year}`];
                         }}
+                        itemStyle={{ padding: '2px 0' }}
                       />
                       <Legend 
+                        wrapperStyle={{ paddingTop: '16px' }}
                         formatter={(value: string) => {
-                          if (value === 'meta_anual') return <span style={{ color: '#f59e0b' }}>Meta Anual</span>;
+                          if (value === 'meta_anual') return <span style={{ color: '#d97706', fontWeight: 600 }}>Meta Anual</span>;
                           const year = value.split('_')[1];
-                          return <span style={{ color: yearColors[Number(year)], fontWeight: 500 }}>Acumulado {year}</span>;
+                          return <span style={{ color: yearColors[Number(year)], fontWeight: 600 }}>{year}</span>;
                         }}
                       />
                       {metaAnual && (
                         <Line
                           type="monotone"
                           dataKey="meta_anual"
-                          stroke="#f59e0b"
-                          strokeWidth={2}
+                          stroke="#d97706"
+                          strokeWidth={2.5}
                           strokeDasharray="8 4"
                           dot={false}
                         />
@@ -876,9 +895,9 @@ export function KpiAnalysisPanel({
                           type="monotone"
                           dataKey={`acumulado_${year}`}
                           stroke={yearColors[year]}
-                          strokeWidth={year === selectedYear ? 3 : 1.5}
-                          dot={year === selectedYear}
-                          activeDot={{ r: 6, strokeWidth: 2, fill: yearColors[year] }}
+                          strokeWidth={year === selectedYear ? 3.5 : 2.5}
+                          dot={{ r: year === selectedYear ? 4 : 3, fill: yearColors[year], strokeWidth: 0 }}
+                          activeDot={{ r: 7, strokeWidth: 2, stroke: '#fff', fill: yearColors[year] }}
                         />
                       ))}
                     </LineChart>
@@ -958,45 +977,67 @@ export function KpiAnalysisPanel({
               )}
 
               {latestMetrics?.metaProgress && (
-                <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
-                  <h4 className="text-white/80 text-sm mb-4">Proyección vs Meta</h4>
+                <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 border border-white/80 shadow-soft">
+                  <h4 className="text-vision-ink font-medium text-sm mb-4">Proyección vs Meta</h4>
                   <div className="h-64 md:h-80">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart 
                         data={[
                           { 
-                            name: 'Acumulado Actual', 
+                            name: 'Acumulado', 
                             valor: latestMetrics.metaProgress.current,
-                            fill: '#10b981'
+                            fill: '#059669'
                           },
                           { 
-                            name: 'Proyección Anual', 
+                            name: 'Proyección', 
                             valor: latestMetrics.metaProgress.projectedAnnual,
-                            fill: '#6366f1'
+                            fill: '#2563eb'
                           },
                           { 
                             name: 'Meta Anual', 
                             valor: latestMetrics.metaProgress.target,
-                            fill: '#f59e0b'
+                            fill: '#d97706'
                           }
                         ]} 
-                        margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                        margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
                         layout="vertical"
+                        barSize={40}
                       >
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                        <XAxis type="number" stroke="rgba(255,255,255,0.5)" fontSize={12} tickFormatter={(v: number) => formatValue(v)} />
-                        <YAxis type="category" dataKey="name" stroke="rgba(255,255,255,0.5)" fontSize={12} width={120} />
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.3)" horizontal={true} vertical={false} />
+                        <XAxis 
+                          type="number" 
+                          stroke="#64748b" 
+                          fontSize={11} 
+                          tickFormatter={(v: number) => formatValue(v)}
+                          axisLine={{ stroke: '#cbd5e1' }}
+                          tickLine={{ stroke: '#cbd5e1' }}
+                        />
+                        <YAxis 
+                          type="category" 
+                          dataKey="name" 
+                          stroke="#64748b" 
+                          fontSize={13}
+                          fontWeight={500}
+                          width={90}
+                          axisLine={false}
+                          tickLine={false}
+                        />
                         <Tooltip
+                          cursor={{ fill: 'rgba(148,163,184,0.1)' }}
                           contentStyle={{
-                            backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                            border: '1px solid rgba(255,255,255,0.2)',
+                            backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                            border: '1px solid rgba(148,163,184,0.3)',
                             borderRadius: '12px',
-                            boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
+                            boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+                            padding: '12px 16px'
                           }}
-                          labelStyle={{ color: 'white', fontWeight: 'bold' }}
+                          labelStyle={{ color: '#0f172a', fontWeight: 'bold', marginBottom: '4px' }}
                           formatter={(value: number) => [formatValue(value), 'Valor']}
                         />
-                        <Bar dataKey="valor" radius={[0, 4, 4, 0]} />
+                        <Bar 
+                          dataKey="valor" 
+                          radius={[0, 8, 8, 0]}
+                        />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
