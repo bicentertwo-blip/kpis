@@ -7,18 +7,47 @@
 -- PASO 1: Modificar tabla kpi_roe_roa_resumen
 -- =====================================================
 
--- Renombrar columnas existentes a operativos
+-- Renombrar columnas existentes a operativos (si existen)
+DO $$ 
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'kpi_roe_roa_resumen' AND column_name = 'roe') THEN
+        ALTER TABLE kpi_roe_roa_resumen RENAME COLUMN roe TO roe_operativo;
+    END IF;
+END $$;
+
+DO $$ 
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'kpi_roe_roa_resumen' AND column_name = 'roa') THEN
+        ALTER TABLE kpi_roe_roa_resumen RENAME COLUMN roa TO roa_operativo;
+    END IF;
+END $$;
+
+DO $$ 
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'kpi_roe_roa_resumen' AND column_name = 'meta_roe') THEN
+        ALTER TABLE kpi_roe_roa_resumen RENAME COLUMN meta_roe TO meta_roe_operativo;
+    END IF;
+END $$;
+
+DO $$ 
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'kpi_roe_roa_resumen' AND column_name = 'meta_roa') THEN
+        ALTER TABLE kpi_roe_roa_resumen RENAME COLUMN meta_roa TO meta_roa_operativo;
+    END IF;
+END $$;
+
+-- Agregar columnas operativas si no existen (por si es tabla nueva)
 ALTER TABLE kpi_roe_roa_resumen 
-RENAME COLUMN roe TO roe_operativo;
+ADD COLUMN IF NOT EXISTS roe_operativo DECIMAL(8,4);
 
 ALTER TABLE kpi_roe_roa_resumen 
-RENAME COLUMN roa TO roa_operativo;
+ADD COLUMN IF NOT EXISTS roa_operativo DECIMAL(8,4);
 
 ALTER TABLE kpi_roe_roa_resumen 
-RENAME COLUMN meta_roe TO meta_roe_operativo;
+ADD COLUMN IF NOT EXISTS meta_roe_operativo DECIMAL(8,4);
 
 ALTER TABLE kpi_roe_roa_resumen 
-RENAME COLUMN meta_roa TO meta_roa_operativo;
+ADD COLUMN IF NOT EXISTS meta_roa_operativo DECIMAL(8,4);
 
 -- Agregar columnas para ROE/ROA Neto
 ALTER TABLE kpi_roe_roa_resumen 
@@ -34,11 +63,18 @@ ADD COLUMN IF NOT EXISTS meta_roe_neto DECIMAL(8,4);
 ALTER TABLE kpi_roe_roa_resumen 
 ADD COLUMN IF NOT EXISTS meta_roa_neto DECIMAL(8,4);
 
--- Renombrar meta_anual existente a meta_anual_roe_operativo
-ALTER TABLE kpi_roe_roa_resumen 
-RENAME COLUMN meta_anual TO meta_anual_roe_operativo;
+-- Renombrar meta_anual si existe
+DO $$ 
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'kpi_roe_roa_resumen' AND column_name = 'meta_anual') THEN
+        ALTER TABLE kpi_roe_roa_resumen RENAME COLUMN meta_anual TO meta_anual_roe_operativo;
+    END IF;
+END $$;
 
--- Agregar metas anuales faltantes
+-- Agregar metas anuales
+ALTER TABLE kpi_roe_roa_resumen 
+ADD COLUMN IF NOT EXISTS meta_anual_roe_operativo DECIMAL(8,4);
+
 ALTER TABLE kpi_roe_roa_resumen 
 ADD COLUMN IF NOT EXISTS meta_anual_roe_neto DECIMAL(8,4);
 
@@ -52,13 +88,21 @@ ADD COLUMN IF NOT EXISTS meta_anual_roa_neto DECIMAL(8,4);
 -- PASO 2: Modificar tabla kpi_roe_roa_detalle
 -- =====================================================
 
--- Agregar columnas de ROE/ROA operativo y neto
+-- Agregar columna utilidad_neta
 ALTER TABLE kpi_roe_roa_detalle
 ADD COLUMN IF NOT EXISTS utilidad_neta DECIMAL(18,2);
 
--- Renombrar columna existente
+-- Renombrar columna existente si existe
+DO $$ 
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'kpi_roe_roa_detalle' AND column_name = 'utilidad_operativa_mensual') THEN
+        ALTER TABLE kpi_roe_roa_detalle RENAME COLUMN utilidad_operativa_mensual TO utilidad_operativa;
+    END IF;
+END $$;
+
+-- Asegurar que utilidad_operativa existe
 ALTER TABLE kpi_roe_roa_detalle
-RENAME COLUMN utilidad_operativa_mensual TO utilidad_operativa;
+ADD COLUMN IF NOT EXISTS utilidad_operativa DECIMAL(18,2);
 
 -- Agregar columnas calculadas/reportadas
 ALTER TABLE kpi_roe_roa_detalle
