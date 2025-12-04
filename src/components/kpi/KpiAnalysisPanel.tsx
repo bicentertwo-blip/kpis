@@ -12,11 +12,14 @@ import {
   AlertTriangle,
   Clock,
   Loader2,
-  Layers
+  Layers,
+  Sparkles,
+  Trophy
 } from 'lucide-react';
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { KpiDefinition, SectionDefinition } from '@/types/kpi-definitions';
+import { cn } from '@/utils/ui';
 
 interface KpiAnalysisPanelProps {
   config: KpiDefinition;
@@ -852,23 +855,65 @@ export function KpiAnalysisPanel({
                       </tr>
                     </thead>
                     <tbody>
-                      {monthlyChartData.map((row, index) => (
-                        <tr key={index} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors">
-                          <td className="p-3 text-vision-ink font-medium">{String(row.mes)}</td>
-                          {[...availableYears].sort((a, b) => a - b).map((year: number) => {
-                            const value = row[`valor_${year}`] as number | null;
-                            return (
-                              <td key={year} className="p-3 text-right text-vision-ink/80">
-                                {value !== null ? formatValue(value) : '-'}
-                              </td>
-                            );
-                          })}
-                          {/* Columna de Meta */}
-                          <td className="p-3 text-right text-plasma-blue font-medium">
-                            {row.meta !== null ? formatValue(row.meta as number) : '-'}
-                          </td>
-                        </tr>
-                      ))}
+                      {monthlyChartData.map((row, index) => {
+                        const selectedYearValue = row[`valor_${selectedYear}`] as number | null;
+                        const metaValue = row.meta as number | null;
+                        const metaAchieved = selectedYearValue !== null && metaValue !== null && metaValue > 0 && 
+                          (higherIsBetter ? selectedYearValue >= metaValue : selectedYearValue <= metaValue);
+                        
+                        return (
+                          <tr key={index} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors">
+                            <td className="p-3 text-vision-ink font-medium">{String(row.mes)}</td>
+                            {[...availableYears].sort((a, b) => a - b).map((year: number) => {
+                              const value = row[`valor_${year}`] as number | null;
+                              const isSelectedYear = year === selectedYear;
+                              const achieved = isSelectedYear && metaAchieved;
+                              
+                              return (
+                                <td 
+                                  key={year} 
+                                  className={cn(
+                                    "p-3 text-right transition-all duration-300",
+                                    achieved 
+                                      ? "text-emerald-700 font-semibold" 
+                                      : "text-vision-ink/80"
+                                  )}
+                                >
+                                  <div className={cn(
+                                    "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg transition-all duration-300",
+                                    achieved && "bg-gradient-to-r from-emerald-50 to-green-50 shadow-sm ring-1 ring-emerald-200/50"
+                                  )}>
+                                    {achieved && (
+                                      <Sparkles className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
+                                    )}
+                                    <span>{value !== null ? formatValue(value) : '-'}</span>
+                                  </div>
+                                </td>
+                              );
+                            })}
+                            {/* Columna de Meta */}
+                            <td className={cn(
+                              "p-3 text-right font-medium transition-all duration-300",
+                              metaAchieved 
+                                ? "text-emerald-600" 
+                                : "text-plasma-blue"
+                            )}>
+                              <div className={cn(
+                                "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg transition-all duration-300",
+                                metaAchieved && "bg-gradient-to-r from-emerald-100 to-green-100 shadow-sm ring-1 ring-emerald-300/60"
+                              )}>
+                                {metaAchieved && (
+                                  <Trophy className="w-3.5 h-3.5 text-amber-500" />
+                                )}
+                                <span>{metaValue !== null ? formatValue(metaValue) : '-'}</span>
+                                {metaAchieved && (
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -972,24 +1017,65 @@ export function KpiAnalysisPanel({
                       </tr>
                     </thead>
                     <tbody>
-                      {accumulatedChartData.map((row, index) => (
-                        <tr key={index} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors">
-                          <td className="p-3 text-vision-ink font-medium">{String(row.mes)}</td>
-                          {[...availableYears].sort((a, b) => a - b).map((year: number) => {
-                            const value = row[`acumulado_${year}`] as number | null;
-                            return (
-                              <td key={year} className="p-3 text-right text-vision-ink/80">
-                                {value !== null ? formatValue(value) : '-'}
+                      {accumulatedChartData.map((row, index) => {
+                        const selectedYearAccum = row[`acumulado_${selectedYear}`] as number | null;
+                        const metaAnualAchieved = selectedYearAccum !== null && metaAnual !== null && metaAnual > 0 &&
+                          (higherIsBetter ? selectedYearAccum >= metaAnual : selectedYearAccum <= metaAnual);
+                        
+                        return (
+                          <tr key={index} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors">
+                            <td className="p-3 text-vision-ink font-medium">{String(row.mes)}</td>
+                            {[...availableYears].sort((a, b) => a - b).map((year: number) => {
+                              const value = row[`acumulado_${year}`] as number | null;
+                              const isSelectedYear = year === selectedYear;
+                              const achieved = isSelectedYear && metaAnualAchieved;
+                              
+                              return (
+                                <td 
+                                  key={year} 
+                                  className={cn(
+                                    "p-3 text-right transition-all duration-300",
+                                    achieved 
+                                      ? "text-emerald-700 font-semibold" 
+                                      : "text-vision-ink/80"
+                                  )}
+                                >
+                                  <div className={cn(
+                                    "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg transition-all duration-300",
+                                    achieved && "bg-gradient-to-r from-emerald-50 to-green-50 shadow-sm ring-1 ring-emerald-200/50"
+                                  )}>
+                                    {achieved && (
+                                      <Sparkles className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
+                                    )}
+                                    <span>{value !== null ? formatValue(value) : '-'}</span>
+                                  </div>
+                                </td>
+                              );
+                            })}
+                            {metaAnual && (
+                              <td className={cn(
+                                "p-3 text-right font-medium transition-all duration-300",
+                                metaAnualAchieved 
+                                  ? "text-emerald-600" 
+                                  : "text-amber-600"
+                              )}>
+                                <div className={cn(
+                                  "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg transition-all duration-300",
+                                  metaAnualAchieved && "bg-gradient-to-r from-emerald-100 to-green-100 shadow-sm ring-1 ring-emerald-300/60"
+                                )}>
+                                  {metaAnualAchieved && (
+                                    <Trophy className="w-3.5 h-3.5 text-amber-500" />
+                                  )}
+                                  <span>{formatValue(metaAnual)}</span>
+                                  {metaAnualAchieved && (
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                                  )}
+                                </div>
                               </td>
-                            );
-                          })}
-                          {metaAnual && (
-                            <td className="p-3 text-right text-amber-600 font-medium">
-                              {formatValue(metaAnual)}
-                            </td>
-                          )}
-                        </tr>
-                      ))}
+                            )}
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
