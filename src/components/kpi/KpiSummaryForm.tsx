@@ -534,11 +534,13 @@ interface FormattedInputProps {
 const FormattedInput = ({ field, value, onChange, disabled }: FormattedInputProps) => {
   const [isFocused, setIsFocused] = useState(false)
   
-  // Para campos de texto simple, no formatear
-  if (field.type === 'text') {
+  // Para campos de texto simple o el campo año, no formatear
+  if (field.type === 'text' || field.id === 'anio') {
     return (
       <input
-        type="text"
+        type={field.id === 'anio' ? 'number' : 'text'}
+        min={field.min}
+        max={field.max}
         className={cn(
           'w-full rounded-xl lg:rounded-2xl',
           'border border-white/60 bg-white/60',
