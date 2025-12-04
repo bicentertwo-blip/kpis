@@ -50,7 +50,7 @@ export const KPI_DASHBOARD_METRICS: KpiDashboardMetric[] = [
     route: '/rentabilidad-operativa',
   },
   {
-    id: 'indice-renovacion',
+    id: 'indice-renovacion-creditos',
     name: 'Índice de Renovación',
     shortName: 'Renovación',
     icon: 'RefreshCcw',
@@ -128,7 +128,7 @@ export const KPI_DASHBOARD_METRICS: KpiDashboardMetric[] = [
     route: '/posicionamiento-marca',
   },
   {
-    id: 'innovacion',
+    id: 'innovacion-incremental',
     name: 'Innovación Incremental',
     shortName: 'Innovación',
     icon: 'FlaskRound',
