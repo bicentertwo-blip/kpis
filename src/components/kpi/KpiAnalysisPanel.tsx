@@ -522,34 +522,34 @@ export function KpiAnalysisPanel({
     >
       {/* Header con selector de resumen, año y vistas */}
       <div className="p-4 md:p-5 border-b border-slate-100">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-gradient-to-br from-plasma-blue/10 to-plasma-indigo/10 border border-plasma-blue/20">
-              <BarChart2 className="text-plasma-blue" size={20} />
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2 md:p-2.5 rounded-xl bg-gradient-to-br from-plasma-blue/10 to-plasma-indigo/10 border border-plasma-blue/20 flex-shrink-0">
+              <BarChart2 className="text-plasma-blue" size={18} />
             </div>
-            <div>
-              <h3 className="text-vision-ink font-semibold text-base">Panel de Análisis</h3>
-              <p className="text-soft-slate text-sm">{metricLabel}</p>
+            <div className="min-w-0">
+              <h3 className="text-vision-ink font-semibold text-sm md:text-base">Panel de Análisis</h3>
+              <p className="text-soft-slate text-xs md:text-sm truncate">{metricLabel}</p>
             </div>
           </div>
           
           {/* Selectores de resumen y año */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0 overflow-x-auto scrollbar-hide">
             {/* Selector de resumen (solo si hay más de uno) */}
             {config.summaries.length > 1 && (
-              <div className="relative z-50">
+              <div className="relative z-50 flex-shrink-0">
                 <button
                   onClick={() => setIsSummaryDropdownOpen(!isSummaryDropdownOpen)}
-                  className="flex items-center gap-2 px-3 py-2 bg-white/80 hover:bg-white 
-                           rounded-xl border border-slate-200 transition-all duration-200 min-w-[140px] shadow-soft"
+                  className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-2 bg-white/80 hover:bg-white 
+                           rounded-xl border border-slate-200 transition-all duration-200 min-w-[100px] md:min-w-[140px] shadow-soft"
                 >
-                  <Layers size={15} className="text-plasma-indigo" />
-                  <span className="text-vision-ink font-medium text-sm truncate max-w-[100px]">
+                  <Layers size={14} className="text-plasma-indigo flex-shrink-0" />
+                  <span className="text-vision-ink font-medium text-xs md:text-sm truncate max-w-[60px] md:max-w-[100px]">
                     {selectedSummary?.title?.replace(/^\d+\.\s*/, '') || 'Resumen'}
                   </span>
                   <ChevronDown 
                     size={14} 
-                    className={`text-soft-slate ml-auto transition-transform duration-200 ${isSummaryDropdownOpen ? 'rotate-180' : ''}`} 
+                    className={`text-soft-slate ml-auto transition-transform duration-200 flex-shrink-0 ${isSummaryDropdownOpen ? 'rotate-180' : ''}`} 
                   />
                 </button>
                 
@@ -585,17 +585,17 @@ export function KpiAnalysisPanel({
             )}
 
             {/* Selector de año */}
-            <div className="relative z-50">
+            <div className="relative z-50 flex-shrink-0">
               <button
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="flex items-center gap-2 px-3 py-2 bg-white/80 hover:bg-white 
-                         rounded-xl border border-slate-200 transition-all duration-200 min-w-[100px] shadow-soft"
+                className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-2 bg-white/80 hover:bg-white 
+                         rounded-xl border border-slate-200 transition-all duration-200 min-w-[85px] md:min-w-[100px] shadow-soft"
               >
-                <Calendar size={15} className="text-plasma-blue" />
+                <Calendar size={14} className="text-plasma-blue flex-shrink-0" />
                 <span className="text-vision-ink font-medium text-sm">{selectedYear || 'Año'}</span>
                 <ChevronDown 
                   size={14} 
-                  className={`text-soft-slate ml-auto transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} 
+                  className={`text-soft-slate ml-auto transition-transform duration-200 flex-shrink-0 ${isDropdownOpen ? 'rotate-180' : ''}`} 
                 />
               </button>
               
@@ -1229,42 +1229,42 @@ export function KpiAnalysisPanel({
                             <p className="text-xs text-slate-600 leading-relaxed">
                               La proyección estima el resultado anual basándose en el <span className="font-semibold text-emerald-600">ritmo actual de acumulación</span>.
                             </p>
-                            <div className="flex items-center gap-2 p-2 bg-white/70 rounded-lg border border-slate-200/60">
-                              <div className="flex items-center gap-1.5 text-xs">
-                                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded font-medium">
+                            <div className="p-2 bg-white/70 rounded-lg border border-slate-200/60 overflow-x-auto">
+                              <div className="flex flex-wrap items-center gap-1.5 text-xs min-w-max sm:min-w-0">
+                                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded font-medium whitespace-nowrap">
                                   {formatValue(latestMetrics.metaProgress.current)}
                                 </span>
                                 <span className="text-slate-400">÷</span>
                                 <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded font-medium">
-                                  {latestMetrics.month} meses
+                                  {latestMetrics.month}m
                                 </span>
                                 <span className="text-slate-400">×</span>
                                 <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded font-medium">
                                   12
                                 </span>
                                 <span className="text-slate-400">=</span>
-                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded font-semibold">
+                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded font-semibold whitespace-nowrap">
                                   {formatValue(latestMetrics.metaProgress.projectedAnnual)}
                                 </span>
                               </div>
                             </div>
                             <p className="text-[11px] text-slate-500 italic">
-                              Promedio mensual de {formatValue(latestMetrics.metaProgress.current / latestMetrics.month)} × 12 meses
+                              Promedio mensual: {formatValue(latestMetrics.metaProgress.current / latestMetrics.month)}
                             </p>
                           </div>
                         ) : (
                           <div className="space-y-2">
                             <p className="text-xs text-slate-600 leading-relaxed">
-                              Para métricas de <span className="font-semibold text-blue-600">porcentaje</span>, la proyección es igual al <span className="font-semibold text-emerald-600">promedio acumulado</span> actual, ya que representa el comportamiento esperado.
+                              Para métricas de <span className="font-semibold text-blue-600">porcentaje</span>, la proyección = <span className="font-semibold text-emerald-600">promedio acumulado</span>.
                             </p>
-                            <div className="flex items-center gap-2 p-2 bg-white/70 rounded-lg border border-slate-200/60">
-                              <div className="flex items-center gap-1.5 text-xs">
-                                <span className="text-slate-500">Promedio actual:</span>
+                            <div className="p-2 bg-white/70 rounded-lg border border-slate-200/60 overflow-x-auto">
+                              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                                <span className="text-slate-500">Promedio:</span>
                                 <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded font-semibold">
                                   {formatValue(latestMetrics.metaProgress.projectedAnnual)}
                                 </span>
                                 <span className="text-slate-400">=</span>
-                                <span className="text-slate-500">Proyección anual</span>
+                                <span className="text-slate-500">Proyección</span>
                               </div>
                             </div>
                           </div>
