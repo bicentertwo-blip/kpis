@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, LineChart, Line, Legend } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, LineChart, Line, Legend, LabelList, Cell } from 'recharts';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -14,7 +14,9 @@ import {
   Loader2,
   Layers,
   Sparkles,
-  Trophy
+  Trophy,
+  Lightbulb,
+  Calculator
 } from 'lucide-react';
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -1123,7 +1125,7 @@ export function KpiAnalysisPanel({
               )}
 
               {latestMetrics?.metaProgress && (
-                <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 border border-white/80 shadow-soft">
+                <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-5 border border-white/80 shadow-soft">
                   <h4 className="text-vision-ink font-medium text-sm mb-4">Proyección vs Meta</h4>
                   <div className="h-64 md:h-80">
                     <ResponsiveContainer width="100%" height="100%">
@@ -1145,9 +1147,9 @@ export function KpiAnalysisPanel({
                             fill: '#d97706'
                           }
                         ]} 
-                        margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                        margin={{ top: 20, right: 80, left: 20, bottom: 20 }}
                         layout="vertical"
-                        barSize={40}
+                        barSize={45}
                       >
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.3)" horizontal={true} vertical={false} />
                         <XAxis 
@@ -1183,10 +1185,93 @@ export function KpiAnalysisPanel({
                         <Bar 
                           dataKey="valor" 
                           radius={[0, 8, 8, 0]}
-                        />
+                        >
+                          {[
+                            { fill: '#059669' },
+                            { fill: '#2563eb' },
+                            { fill: '#d97706' }
+                          ].map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                          ))}
+                          <LabelList 
+                            dataKey="valor" 
+                            position="right" 
+                            formatter={(value) => formatValue(Number(value ?? 0))}
+                            style={{ 
+                              fill: '#334155', 
+                              fontSize: '12px', 
+                              fontWeight: 600 
+                            }}
+                          />
+                        </Bar>
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
+                  
+                  {/* Explicación elegante de la proyección */}
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                    className="mt-5 p-4 rounded-xl bg-gradient-to-br from-blue-50/80 via-indigo-50/60 to-violet-50/40 border border-blue-100/60 shadow-sm"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 shadow-md flex-shrink-0">
+                        <Lightbulb className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <h5 className="text-sm font-semibold text-slate-800 mb-2 flex items-center gap-2">
+                          <span>¿Cómo se calcula la proyección?</span>
+                          <Calculator className="w-3.5 h-3.5 text-blue-500" />
+                        </h5>
+                        {shouldSum ? (
+                          <div className="space-y-2">
+                            <p className="text-xs text-slate-600 leading-relaxed">
+                              La proyección estima el resultado anual basándose en el <span className="font-semibold text-emerald-600">ritmo actual de acumulación</span>.
+                            </p>
+                            <div className="flex items-center gap-2 p-2 bg-white/70 rounded-lg border border-slate-200/60">
+                              <div className="flex items-center gap-1.5 text-xs">
+                                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded font-medium">
+                                  {formatValue(latestMetrics.metaProgress.current)}
+                                </span>
+                                <span className="text-slate-400">÷</span>
+                                <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded font-medium">
+                                  {latestMetrics.month} meses
+                                </span>
+                                <span className="text-slate-400">×</span>
+                                <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded font-medium">
+                                  12
+                                </span>
+                                <span className="text-slate-400">=</span>
+                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded font-semibold">
+                                  {formatValue(latestMetrics.metaProgress.projectedAnnual)}
+                                </span>
+                              </div>
+                            </div>
+                            <p className="text-[11px] text-slate-500 italic">
+                              Promedio mensual de {formatValue(latestMetrics.metaProgress.current / latestMetrics.month)} × 12 meses
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <p className="text-xs text-slate-600 leading-relaxed">
+                              Para métricas de <span className="font-semibold text-blue-600">porcentaje</span>, la proyección es igual al <span className="font-semibold text-emerald-600">promedio acumulado</span> actual, ya que representa el comportamiento esperado.
+                            </p>
+                            <div className="flex items-center gap-2 p-2 bg-white/70 rounded-lg border border-slate-200/60">
+                              <div className="flex items-center gap-1.5 text-xs">
+                                <span className="text-slate-500">Promedio actual:</span>
+                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded font-semibold">
+                                  {formatValue(latestMetrics.metaProgress.projectedAnnual)}
+                                </span>
+                                <span className="text-slate-400">=</span>
+                                <span className="text-slate-500">Proyección anual</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
                 </div>
               )}
             </motion.div>
