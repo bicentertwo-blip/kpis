@@ -181,9 +181,17 @@ export function KpiAnalysisPanel({
         entry[`valor_${year}`] = yearData ? Number(yearData[metricKey]) || 0 : null;
       });
       
+      // Agregar meta mensual del año seleccionado
+      const selectedYearData = dataByYear[selectedYear]?.find((d: SummaryRecord) => Number(d.mes) === monthNum);
+      if (selectedYearData && selectedYearData.meta !== undefined && selectedYearData.meta !== null) {
+        entry['meta'] = Number(selectedYearData.meta);
+      } else {
+        entry['meta'] = null;
+      }
+      
       return entry;
     });
-  }, [dataByYear, availableYears, metricKey]);
+  }, [dataByYear, availableYears, metricKey, selectedYear]);
 
   // Función para calcular acumulado (suma o promedio según configuración)
   const calculateAccumulated = useCallback((data: SummaryRecord[], upToMonth: number): number => {
@@ -834,6 +842,13 @@ export function KpiAnalysisPanel({
                             </div>
                           </th>
                         ))}
+                        {/* Columna de Meta del año seleccionado */}
+                        <th className="text-right text-soft-slate p-3 font-medium">
+                          <div className="flex items-center justify-end gap-2">
+                            <Target className="w-3.5 h-3.5 text-plasma-blue" />
+                            <span>Meta {selectedYear}</span>
+                          </div>
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -848,6 +863,10 @@ export function KpiAnalysisPanel({
                               </td>
                             );
                           })}
+                          {/* Columna de Meta */}
+                          <td className="p-3 text-right text-plasma-blue font-medium">
+                            {row.meta !== null ? formatValue(row.meta as number) : '-'}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
