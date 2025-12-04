@@ -4,12 +4,22 @@
  * MODO MANUAL: Botón para guardar e insertar en la base de datos
  */
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { Hash, DollarSign, Percent, Type, AlignLeft, ChevronDown, Check, Save, RotateCcw, Loader2, CheckCircle2, AlertCircle, AlertTriangle, Target } from 'lucide-react'
 import type { SectionDefinition, FieldDefinition } from '@/types/kpi-definitions'
 import { useKpiSummaryForm } from '@/hooks/useKpiSummaryForm'
 import { cn } from '@/utils/ui'
+
+// Formatear número con separadores de miles
+const formatWithThousands = (value: string | number | undefined): string => {
+  if (value === undefined || value === null || value === '') return ''
+  const numStr = String(value).replace(/[^0-9.-]/g, '')
+  if (numStr === '' || numStr === '-') return numStr
+  const num = parseFloat(numStr)
+  if (isNaN(num)) return ''
+  return num.toLocaleString('en-US', { maximumFractionDigits: 2 })
+}
 
 interface KpiSummaryFormProps {
   section: SectionDefinition
@@ -254,33 +264,19 @@ export const KpiSummaryForm = ({ section, filters }: KpiSummaryFormProps) => {
         </div>
 
         <div className="relative">
-          {config.prefix && (
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-soft-slate text-sm">
-              {config.prefix}
+          {field.type === 'currency' && (
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-soft-slate text-sm font-medium">
+              $
             </span>
           )}
-          <input
-            type={field.type === 'text' ? 'text' : 'number'}
-            step={field.type === 'percentage' ? 0.1 : field.type === 'currency' ? 0.01 : 1}
-            min={field.min}
-            max={field.max}
-            className={cn(
-              'w-full rounded-xl lg:rounded-2xl',
-              'border border-white/60 bg-white/60',
-              'py-3 text-sm text-vision-ink',
-              config.prefix ? 'pl-8 pr-4' : 'px-4',
-              'placeholder:text-soft-slate/50',
-              'focus:border-plasma-blue/40 focus:bg-white/80 focus:shadow-glow-sm',
-              'focus:outline-none transition-all duration-200',
-              'disabled:opacity-50 disabled:cursor-not-allowed'
-            )}
-            placeholder={field.placeholder}
-            value={(value as string | number | undefined) ?? ''}
-            onChange={(e) => updateField(field.id, e.target.value)}
+          <FormattedInput
+            field={field}
+            value={value}
+            onChange={(newValue) => updateField(field.id, newValue)}
             disabled={loading}
           />
           {field.type === 'percentage' && (
-            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-soft-slate text-sm">
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-soft-slate text-sm font-medium">
               %
             </span>
           )}
@@ -524,5 +520,88 @@ export const KpiSummaryForm = ({ section, filters }: KpiSummaryFormProps) => {
         </motion.div>
       )}
     </div>
+  )
+}
+
+// Componente de input formateado para montos y números
+interface FormattedInputProps {
+  field: FieldDefinition
+  value: unknown
+  onChange: (value: string) => void
+  disabled?: boolean
+}
+
+const FormattedInput = ({ field, value, onChange, disabled }: FormattedInputProps) => {
+  const [isFocused, setIsFocused] = useState(false)
+  
+  // Para campos de texto simple, no formatear
+  if (field.type === 'text') {
+    return (
+      <input
+        type="text"
+        className={cn(
+          'w-full rounded-xl lg:rounded-2xl',
+          'border border-white/60 bg-white/60',
+          'py-3 text-sm text-vision-ink',
+          'px-4',
+          'placeholder:text-soft-slate/50',
+          'focus:border-plasma-blue/40 focus:bg-white/80 focus:shadow-glow-sm',
+          'focus:outline-none transition-all duration-200',
+          'disabled:opacity-50 disabled:cursor-not-allowed'
+        )}
+        placeholder={field.placeholder}
+        value={(value as string) ?? ''}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+      />
+    )
+  }
+  
+  // Valor formateado para mostrar
+  const displayValue = useCallback(() => {
+    if (isFocused) {
+      // Mientras edita, mostrar el valor sin formato
+      return value === undefined || value === null || value === '' ? '' : String(value)
+    }
+    // Cuando no está enfocado, mostrar formateado
+    if (value === undefined || value === null || value === '') return ''
+    return formatWithThousands(value as string | number)
+  }, [value, isFocused])
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target.value
+    // Permitir solo números, punto decimal y signo negativo
+    const cleaned = input.replace(/[^0-9.-]/g, '')
+    // Evitar múltiples puntos
+    const parts = cleaned.split('.')
+    let sanitized = parts[0]
+    if (parts.length > 1) {
+      sanitized += '.' + parts.slice(1).join('')
+    }
+    onChange(sanitized)
+  }
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      className={cn(
+        'w-full rounded-xl lg:rounded-2xl',
+        'border border-white/60 bg-white/60',
+        'py-3 text-sm text-vision-ink',
+        field.type === 'currency' ? 'pl-8 pr-4' : field.type === 'percentage' ? 'pl-4 pr-8' : 'px-4',
+        'placeholder:text-soft-slate/50',
+        'focus:border-plasma-blue/40 focus:bg-white/80 focus:shadow-glow-sm',
+        'focus:outline-none transition-all duration-200',
+        'disabled:opacity-50 disabled:cursor-not-allowed',
+        'tabular-nums'
+      )}
+      placeholder={field.placeholder}
+      value={displayValue()}
+      onChange={handleChange}
+      onFocus={() => setIsFocused(true)}
+      onBlur={() => setIsFocused(false)}
+      disabled={disabled}
+    />
   )
 }
