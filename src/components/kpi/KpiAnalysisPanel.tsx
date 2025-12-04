@@ -207,6 +207,17 @@ export function KpiAnalysisPanel({
     return shouldSum ? sum : sum / filtered.length;
   }, [metricKey, shouldSum]);
 
+  // Función para calcular meta acumulada (suma para moneda, promedio para porcentaje)
+  const calculateAccumulatedMeta = useCallback((data: SummaryRecord[], upToMonth: number): number | null => {
+    const filtered = data.filter((d: SummaryRecord) => Number(d.mes) <= upToMonth && d.meta !== null && d.meta !== undefined);
+    if (filtered.length === 0) return null;
+    
+    const sum = filtered.reduce((acc: number, d: SummaryRecord) => acc + (Number(d.meta) || 0), 0);
+    
+    // Sumar para moneda, promediar para porcentaje
+    return shouldSum ? sum : sum / filtered.length;
+  }, [shouldSum]);
+
   // Datos acumulados por año (suma o promedio según configuración)
   const accumulatedChartData = useMemo(() => {
     return MONTH_NAMES.map((month, index) => {
@@ -219,14 +230,19 @@ export function KpiAnalysisPanel({
         entry[`acumulado_${year}`] = accumulated || null;
       });
       
-      // Agregar meta anual como línea de referencia
+      // Agregar meta anual como línea de referencia (para gráfica)
       if (metaAnual) {
         entry['meta_anual'] = metaAnual;
       }
       
+      // Agregar meta acumulada (suma o promedio de metas mensuales hasta este mes)
+      const selectedYearData = dataByYear[selectedYear] || [];
+      const metaAcumulada = calculateAccumulatedMeta(selectedYearData, monthNum);
+      entry['meta_acumulada'] = metaAcumulada;
+      
       return entry;
     });
-  }, [dataByYear, availableYears, calculateAccumulated, metaAnual]);
+  }, [dataByYear, availableYears, calculateAccumulated, metaAnual, selectedYear, calculateAccumulatedMeta]);
 
   // Métricas del mes más reciente
   const latestMetrics = useMemo(() => {
@@ -1011,16 +1027,17 @@ export function KpiAnalysisPanel({
                             </div>
                           </th>
                         ))}
-                        {metaAnual && (
-                          <th className="text-right text-amber-600 p-3 font-medium">Meta Anual</th>
+                        {(metaAnual || accumulatedChartData.some(r => r.meta_acumulada !== null)) && (
+                          <th className="text-right text-amber-600 p-3 font-medium">Meta Acum.</th>
                         )}
                       </tr>
                     </thead>
                     <tbody>
                       {accumulatedChartData.map((row, index) => {
                         const selectedYearAccum = row[`acumulado_${selectedYear}`] as number | null;
-                        const metaAnualAchieved = selectedYearAccum !== null && metaAnual !== null && metaAnual > 0 &&
-                          (higherIsBetter ? selectedYearAccum >= metaAnual : selectedYearAccum <= metaAnual);
+                        const metaAcumulada = row.meta_acumulada as number | null;
+                        const metaAchieved = selectedYearAccum !== null && metaAcumulada !== null && metaAcumulada > 0 &&
+                          (higherIsBetter ? selectedYearAccum >= metaAcumulada : selectedYearAccum <= metaAcumulada);
                         
                         return (
                           <tr key={index} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors">
@@ -1028,7 +1045,7 @@ export function KpiAnalysisPanel({
                             {[...availableYears].sort((a, b) => a - b).map((year: number) => {
                               const value = row[`acumulado_${year}`] as number | null;
                               const isSelectedYear = year === selectedYear;
-                              const achieved = isSelectedYear && metaAnualAchieved;
+                              const achieved = isSelectedYear && metaAchieved;
                               
                               return (
                                 <td 
@@ -1052,22 +1069,22 @@ export function KpiAnalysisPanel({
                                 </td>
                               );
                             })}
-                            {metaAnual && (
+                            {(metaAnual || accumulatedChartData.some(r => r.meta_acumulada !== null)) && (
                               <td className={cn(
                                 "p-3 text-right font-medium transition-all duration-300",
-                                metaAnualAchieved 
+                                metaAchieved 
                                   ? "text-emerald-600" 
                                   : "text-amber-600"
                               )}>
                                 <div className={cn(
                                   "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg transition-all duration-300",
-                                  metaAnualAchieved && "bg-gradient-to-r from-emerald-100 to-green-100 shadow-sm ring-1 ring-emerald-300/60"
+                                  metaAchieved && "bg-gradient-to-r from-emerald-100 to-green-100 shadow-sm ring-1 ring-emerald-300/60"
                                 )}>
-                                  {metaAnualAchieved && (
+                                  {metaAchieved && (
                                     <Trophy className="w-3.5 h-3.5 text-amber-500" />
                                   )}
-                                  <span>{formatValue(metaAnual)}</span>
-                                  {metaAnualAchieved && (
+                                  <span>{metaAcumulada !== null ? formatValue(metaAcumulada) : '-'}</span>
+                                  {metaAchieved && (
                                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
                                   )}
                                 </div>
