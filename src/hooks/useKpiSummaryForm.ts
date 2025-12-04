@@ -223,31 +223,46 @@ export const useKpiSummaryForm = (
     return await persistData(state.formValues)
   }, [persistData, state.formValues])
 
-  // Actualizar SOLO meta_anual en todos los registros del año
+  // Actualizar SOLO campos de meta_anual en todos los registros del año
   // Esta función hace UPDATE en lugar de INSERT
+  // Soporta múltiples campos: meta_anual, meta_anual_roe_operativo, meta_anual_roe_neto, etc.
   const updateMetaAnualOnly = useCallback(async (): Promise<boolean> => {
     if (!userId) return false
 
     const anio = state.formValues['anio']
-    const metaAnual = state.formValues['meta_anual']
 
-    if (!anio || metaAnual === undefined || metaAnual === null || metaAnual === '') {
-      setState((prev) => ({ ...prev, error: 'Debe especificar el año y la meta anual' }))
+    // Buscar todos los campos que empiecen con "meta_anual"
+    const metaAnualFields = section.fields.filter(f => f.id.startsWith('meta_anual'))
+    
+    // Construir objeto con los valores de meta anual que tienen datos
+    const updatePayload: Record<string, unknown> = {
+      updated_at: new Date().toISOString()
+    }
+    
+    let hasMetaAnualValue = false
+    metaAnualFields.forEach((field) => {
+      const value = state.formValues[field.id]
+      if (value !== undefined && value !== null && value !== '') {
+        const numValue = parseFloat(String(value).replace(/[$%,]/g, ''))
+        if (!isNaN(numValue)) {
+          updatePayload[field.id] = numValue
+          hasMetaAnualValue = true
+        }
+      }
+    })
+
+    if (!anio || !hasMetaAnualValue) {
+      setState((prev) => ({ ...prev, error: 'Debe especificar el año y al menos una meta anual' }))
       return false
     }
 
     setState((prev) => ({ ...prev, saving: true, error: null, saveSuccess: false }))
 
     try {
-      const metaAnualValue = parseFloat(String(metaAnual).replace(/[$%,]/g, ''))
-
-      // UPDATE: Actualizar meta_anual en todos los registros del año
+      // UPDATE: Actualizar metas anuales en todos los registros del año
       const { error } = await supabase
         .from(section.tableName)
-        .update({ 
-          meta_anual: metaAnualValue,
-          updated_at: new Date().toISOString()
-        })
+        .update(updatePayload)
         .eq('anio', anio)
         .eq('is_current', true)
 
@@ -256,6 +271,12 @@ export const useKpiSummaryForm = (
         return false
       }
 
+      // Limpiar solo los campos de meta_anual después de guardar
+      const clearedFormValues = { ...state.formValues }
+      metaAnualFields.forEach((field) => {
+        clearedFormValues[field.id] = ''
+      })
+
       setState((prev) => ({
         ...prev,
         saving: false,
@@ -263,8 +284,7 @@ export const useKpiSummaryForm = (
         error: null,
         isDirty: false,
         saveSuccess: true,
-        // Limpiar solo el campo meta_anual, mantener el resto
-        formValues: { ...prev.formValues, meta_anual: '' }
+        formValues: clearedFormValues
       }))
 
       // Resetear el flag de éxito después de 3 segundos
@@ -355,15 +375,18 @@ export const useKpiSummaryForm = (
     })
   }, [section.fields, state.formValues])
 
-  // Verificar si se puede guardar solo Meta Anual (año + meta_anual tienen valor)
+  // Verificar si se puede guardar solo Meta Anual (año + al menos una meta_anual tienen valor)
   const canSaveMetaAnual = useMemo(() => {
     const anio = state.formValues['anio']
-    const metaAnual = state.formValues['meta_anual']
-    return (
-      anio !== undefined && anio !== null && anio !== '' &&
-      metaAnual !== undefined && metaAnual !== null && metaAnual !== ''
-    )
-  }, [state.formValues])
+    if (!anio || anio === '') return false
+    
+    // Buscar si hay algún campo meta_anual con valor
+    const metaAnualFields = section.fields.filter(f => f.id.startsWith('meta_anual'))
+    return metaAnualFields.some((field) => {
+      const value = state.formValues[field.id]
+      return value !== undefined && value !== null && value !== ''
+    })
+  }, [section.fields, state.formValues])
 
   return {
     ...state,
