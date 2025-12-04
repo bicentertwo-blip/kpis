@@ -1174,6 +1174,14 @@ export const CUMPLIMIENTO_CONFIG: KpiDefinition = {
           required: true,
         },
         {
+          id: 'descripcion_observaciones',
+          label: 'Descripción de Observaciones',
+          type: 'long-text',
+          placeholder: 'Detalle de las observaciones recibidas...',
+          description: 'Descripción detallada de las observaciones',
+          required: false,
+        },
+        {
           id: 'meta',
           label: 'Meta',
           type: 'number',
