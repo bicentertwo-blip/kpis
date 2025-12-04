@@ -789,7 +789,7 @@ export function KpiAnalysisPanel({
                     <thead>
                       <tr className="bg-slate-50/80">
                         <th className="text-left text-soft-slate p-3 font-medium">Mes</th>
-                        {[...availableYears].sort((a, b) => b - a).map((year: number) => (
+                        {[...availableYears].sort((a, b) => a - b).map((year: number) => (
                           <th key={year} className="text-right text-soft-slate p-3 font-medium">
                             <div className="flex items-center justify-end gap-2">
                               <div 
@@ -806,7 +806,7 @@ export function KpiAnalysisPanel({
                       {monthlyChartData.map((row, index) => (
                         <tr key={index} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors">
                           <td className="p-3 text-vision-ink font-medium">{String(row.mes)}</td>
-                          {[...availableYears].sort((a, b) => b - a).map((year: number) => {
+                          {[...availableYears].sort((a, b) => a - b).map((year: number) => {
                             const value = row[`valor_${year}`] as number | null;
                             return (
                               <td key={year} className="p-3 text-right text-vision-ink/80">
@@ -893,7 +893,7 @@ export function KpiAnalysisPanel({
                     <thead>
                       <tr className="bg-slate-50/80">
                         <th className="text-left text-soft-slate p-3 font-medium">Mes</th>
-                        {[...availableYears].sort((a, b) => b - a).map((year: number) => (
+                        {[...availableYears].sort((a, b) => a - b).map((year: number) => (
                           <th key={year} className="text-right text-soft-slate p-3 font-medium">
                             <div className="flex items-center justify-end gap-2">
                               <div 
@@ -913,7 +913,7 @@ export function KpiAnalysisPanel({
                       {accumulatedChartData.map((row, index) => (
                         <tr key={index} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors">
                           <td className="p-3 text-vision-ink font-medium">{String(row.mes)}</td>
-                          {[...availableYears].sort((a, b) => b - a).map((year: number) => {
+                          {[...availableYears].sort((a, b) => a - b).map((year: number) => {
                             const value = row[`acumulado_${year}`] as number | null;
                             return (
                               <td key={year} className="p-3 text-right text-vision-ink/80">
