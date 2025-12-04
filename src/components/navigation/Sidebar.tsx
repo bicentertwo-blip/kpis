@@ -1,10 +1,11 @@
 import { NavLink } from 'react-router-dom'
+import { useEffect } from 'react'
 import { LayoutDashboard, Settings2, ShieldCheck, LogOut } from 'lucide-react'
 import { KPI_VIEWS } from '@/utils/constants'
 import { KPI_ICON_MAP } from '@/components/kpi/iconMap'
 import { useAuthStore } from '@/store/auth'
 import { usePermissionsStore } from '@/store/permissions'
-import { useProgressStore } from '@/store/progress'
+import { useDashboardKpisStore } from '@/store/dashboardKpis'
 import { Button } from '@/components/base/Button'
 import { cn } from '@/utils/ui'
 
@@ -25,20 +26,30 @@ export const Sidebar = ({ onNavigate }: SidebarProps) => {
   const canAccess = usePermissionsStore((state) => state.canAccess)
   const permissions = usePermissionsStore((state) => state.permissions)
   const loadingPermissions = usePermissionsStore((state) => state.loading)
-  const progressEntries = useProgressStore((state) => state.entries)
+  const { kpiStatuses, fetchKpiStatuses, getStatus } = useDashboardKpisStore()
 
   const visibleNavLinks = navBase.filter((link) => canAccess(link.viewId))
   const visibleKpis = KPI_VIEWS.filter((view) => canAccess(view.id))
   const enabledCount = Object.values(permissions).filter(Boolean).length
 
-  // Helper para obtener color de estado
+  // Cargar estados de KPIs al montar el componente
+  useEffect(() => {
+    // Solo cargar si no hay datos aún
+    if (Object.keys(kpiStatuses).length === 0) {
+      fetchKpiStatuses()
+    }
+  }, [kpiStatuses, fetchKpiStatuses])
+
+  // Helper para obtener color de estado basado en el dashboard
   const getStatusColor = (viewId: KpiViewId) => {
-    const status = progressEntries[viewId]?.status
+    const status = getStatus(viewId)
     switch (status) {
-      case 'complete':
+      case 'green':
         return 'bg-emerald-500'
-      case 'in_progress':
+      case 'yellow':
         return 'bg-amber-500'
+      case 'red':
+        return 'bg-red-500'
       default:
         return 'bg-slate-300'
     }
@@ -142,10 +153,15 @@ export const Sidebar = ({ onNavigate }: SidebarProps) => {
                   </span>
                 )}
                 <span className="truncate flex-1">{view.name}</span>
-                {/* Estado del KPI */}
+                {/* Estado del KPI - basado en rendimiento vs meta */}
                 <span 
                   className={cn('w-2 h-2 rounded-full shrink-0', getStatusColor(view.id))}
-                  aria-label={progressEntries[view.id]?.status === 'complete' ? 'Completado' : progressEntries[view.id]?.status === 'in_progress' ? 'En progreso' : 'Sin iniciar'}
+                  aria-label={
+                    getStatus(view.id) === 'green' ? 'En meta' : 
+                    getStatus(view.id) === 'yellow' ? 'Por debajo de meta' : 
+                    getStatus(view.id) === 'red' ? 'Crítico' : 
+                    'Sin datos'
+                  }
                 />
               </NavLink>
             )
