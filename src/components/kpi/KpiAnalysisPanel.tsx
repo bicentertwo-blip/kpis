@@ -11,11 +11,12 @@ import {
   CheckCircle2,
   AlertTriangle,
   Clock,
-  Loader2
+  Loader2,
+  Layers
 } from 'lucide-react';
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import type { KpiDefinition } from '@/types/kpi-definitions';
+import type { KpiDefinition, SectionDefinition } from '@/types/kpi-definitions';
 
 interface KpiAnalysisPanelProps {
   config: KpiDefinition;
@@ -33,35 +34,37 @@ export function KpiAnalysisPanel({
 }: KpiAnalysisPanelProps) {
   const [activeView, setActiveView] = useState<'overview' | 'monthly' | 'accumulated' | 'annual'>('overview');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isSummaryDropdownOpen, setIsSummaryDropdownOpen] = useState(false);
   const [summaryData, setSummaryData] = useState<SummaryRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState<number>(initialFilters.anio);
+  const [selectedSummaryIndex, setSelectedSummaryIndex] = useState(0);
 
-  // Detectar la clave de métrica principal del primer resumen
+  // Resumen seleccionado
+  const selectedSummary: SectionDefinition | undefined = config.summaries[selectedSummaryIndex];
+
+  // Detectar la clave de métrica principal del resumen seleccionado
   const metricKey = useMemo(() => {
-    const firstSummary = config.summaries[0];
-    if (!firstSummary?.fields) return 'valor';
-    // Buscar el primer campo que no sea anio, mes, meta o meta_anual
-    const metricField = firstSummary.fields.find(
-      f => !['anio', 'mes', 'meta', 'meta_anual'].includes(f.id)
+    if (!selectedSummary?.fields) return 'valor';
+    // Buscar el primer campo que no sea anio, mes, meta, meta_anual ni empiece con meta_anual
+    const metricField = selectedSummary.fields.find(
+      f => !['anio', 'mes', 'meta'].includes(f.id) && !f.id.startsWith('meta_anual') && !f.id.startsWith('meta_')
     );
     return metricField?.id || 'valor';
-  }, [config.summaries]);
+  }, [selectedSummary]);
 
   const metricLabel = useMemo(() => {
-    const firstSummary = config.summaries[0];
-    if (!firstSummary?.fields) return 'Valor';
-    const metricField = firstSummary.fields.find(f => f.id === metricKey);
+    if (!selectedSummary?.fields) return 'Valor';
+    const metricField = selectedSummary.fields.find(f => f.id === metricKey);
     return metricField?.label || 'Valor';
-  }, [config.summaries, metricKey]);
+  }, [selectedSummary, metricKey]);
 
-  // Determinar si es porcentaje o moneda
+  // Determinar si es porcentaje o moneda (para saber si promediar o sumar)
   const isPercentage = useMemo(() => {
-    const firstSummary = config.summaries[0];
-    if (!firstSummary?.fields) return false;
-    const metricField = firstSummary.fields.find(f => f.id === metricKey);
+    if (!selectedSummary?.fields) return false;
+    const metricField = selectedSummary.fields.find(f => f.id === metricKey);
     return metricField?.type === 'percentage';
-  }, [config.summaries, metricKey]);
+  }, [selectedSummary, metricKey]);
 
   const formatValue = useCallback((v: number): string => {
     if (v === null || v === undefined) return '-';
@@ -69,10 +72,10 @@ export function KpiAnalysisPanel({
     return v.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 0 });
   }, [isPercentage]);
 
-  // Cargar datos del primer resumen
+  // Cargar datos del resumen seleccionado
   useEffect(() => {
     const loadData = async () => {
-      const tableName = config.summaries[0]?.tableName;
+      const tableName = selectedSummary?.tableName;
       if (!tableName) {
         setLoading(false);
         return;
@@ -98,7 +101,7 @@ export function KpiAnalysisPanel({
     };
 
     loadData();
-  }, [config.summaries]);
+  }, [selectedSummary]);
 
   // Años disponibles
   const availableYears = useMemo(() => {
@@ -138,10 +141,18 @@ export function KpiAnalysisPanel({
     return dataByYear[selectedYear];
   }, [selectedYear, dataByYear]);
 
-  // Obtener meta anual del año seleccionado
+  // Obtener meta anual del año seleccionado (busca cualquier campo que empiece con meta_anual)
   const metaAnual = useMemo(() => {
-    const withMeta = currentYearData.find((item: SummaryRecord) => item.meta_anual !== null && item.meta_anual !== undefined);
-    return withMeta ? Number(withMeta.meta_anual) : null;
+    for (const item of currentYearData) {
+      // Buscar cualquier campo que empiece con meta_anual y tenga valor
+      const metaAnualField = Object.keys(item).find(
+        key => key.startsWith('meta_anual') && item[key] !== null && item[key] !== undefined
+      );
+      if (metaAnualField) {
+        return Number(item[metaAnualField]);
+      }
+    }
+    return null;
   }, [currentYearData]);
 
   // Datos para gráfica mensual
@@ -160,7 +171,18 @@ export function KpiAnalysisPanel({
     });
   }, [dataByYear, availableYears, metricKey]);
 
-  // Datos acumulados por año
+  // Función para calcular acumulado (suma para moneda, promedio para porcentaje)
+  const calculateAccumulated = useCallback((data: SummaryRecord[], upToMonth: number): number => {
+    const filtered = data.filter((d: SummaryRecord) => Number(d.mes) <= upToMonth);
+    if (filtered.length === 0) return 0;
+    
+    const sum = filtered.reduce((acc: number, d: SummaryRecord) => acc + (Number(d[metricKey]) || 0), 0);
+    
+    // Para porcentajes: promedio; para moneda: suma
+    return isPercentage ? sum / filtered.length : sum;
+  }, [metricKey, isPercentage]);
+
+  // Datos acumulados por año (suma para moneda, promedio para porcentaje)
   const accumulatedChartData = useMemo(() => {
     return MONTH_NAMES.map((month, index) => {
       const monthNum = index + 1;
@@ -168,9 +190,7 @@ export function KpiAnalysisPanel({
       
       availableYears.forEach((year: number) => {
         const yearData = dataByYear[year] || [];
-        const accumulated = yearData
-          .filter((d: SummaryRecord) => Number(d.mes) <= monthNum)
-          .reduce((sum: number, d: SummaryRecord) => sum + (Number(d[metricKey]) || 0), 0);
+        const accumulated = calculateAccumulated(yearData, monthNum);
         entry[`acumulado_${year}`] = accumulated || null;
       });
       
@@ -181,7 +201,7 @@ export function KpiAnalysisPanel({
       
       return entry;
     });
-  }, [dataByYear, availableYears, metricKey, metaAnual]);
+  }, [dataByYear, availableYears, calculateAccumulated, metaAnual]);
 
   // Métricas del mes más reciente
   const latestMetrics = useMemo(() => {
@@ -205,17 +225,15 @@ export function KpiAnalysisPanel({
       }
     });
 
-    // Calcular acumulado actual
-    const currentAccumulated = currentYearData.reduce((sum: number, d: SummaryRecord) => sum + (Number(d[metricKey]) || 0), 0);
+    // Calcular acumulado actual (suma para moneda, promedio para porcentaje)
+    const currentAccumulated = calculateAccumulated(currentYearData, latestMonth);
     
     // Comparar acumulado con años anteriores
     const accumulatedComparisons: Record<number, { value: number; change: number; changePercent: number }> = {};
     
     availableYears.filter((y: number) => y !== selectedYear).forEach((year: number) => {
       const yearData = dataByYear[year] || [];
-      const prevAccumulated = yearData
-        .filter((d: SummaryRecord) => Number(d.mes) <= latestMonth)
-        .reduce((sum: number, d: SummaryRecord) => sum + (Number(d[metricKey]) || 0), 0);
+      const prevAccumulated = calculateAccumulated(yearData, latestMonth);
       
       if (prevAccumulated > 0) {
         accumulatedComparisons[year] = {
@@ -229,13 +247,20 @@ export function KpiAnalysisPanel({
     // Progreso hacia meta anual
     let metaProgress = null;
     if (metaAnual && metaAnual > 0) {
+      // Para porcentajes: el acumulado ya es el promedio, comparar directamente con meta
+      // Para moneda: proyectar al año completo
+      const percent = (currentAccumulated / metaAnual) * 100;
+      const projectedAnnual = isPercentage 
+        ? currentAccumulated  // Para porcentajes, el promedio actual es la proyección
+        : (latestMonth > 0 ? (currentAccumulated / latestMonth) * 12 : 0);
+      
       metaProgress = {
         current: currentAccumulated,
         target: metaAnual,
-        percent: (currentAccumulated / metaAnual) * 100,
+        percent,
         remaining: metaAnual - currentAccumulated,
         monthsRemaining: 12 - latestMonth,
-        projectedAnnual: latestMonth > 0 ? (currentAccumulated / latestMonth) * 12 : 0
+        projectedAnnual
       };
     }
 
@@ -248,7 +273,7 @@ export function KpiAnalysisPanel({
       accumulatedComparisons,
       metaProgress
     };
-  }, [currentYearData, dataByYear, availableYears, selectedYear, metricKey, metaAnual]);
+  }, [currentYearData, dataByYear, availableYears, selectedYear, metricKey, metaAnual, calculateAccumulated, isPercentage]);
 
   // Colores para años en gráficas
   const yearColors: Record<number, string> = useMemo(() => {
@@ -428,7 +453,7 @@ export function KpiAnalysisPanel({
       animate={{ opacity: 1, y: 0 }}
       className="bg-gradient-to-br from-slate-900/80 to-slate-800/60 backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden"
     >
-      {/* Header con selector de año y vistas */}
+      {/* Header con selector de resumen, año y vistas */}
       <div className="p-4 md:p-6 border-b border-white/10">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -437,59 +462,111 @@ export function KpiAnalysisPanel({
             </div>
             <div>
               <h3 className="text-white font-semibold text-lg">Panel de Análisis</h3>
-              <p className="text-white/50 text-sm">Comparativas y tendencias de {metricLabel}</p>
+              <p className="text-white/50 text-sm">{metricLabel}</p>
             </div>
           </div>
           
-          {/* Selector de año con z-index alto */}
-          <div className="relative z-50">
-            <button
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/15 
-                       rounded-xl border border-white/20 transition-all duration-200 min-w-[140px]"
-            >
-              <Calendar size={16} className="text-emerald-400" />
-              <span className="text-white font-medium">{selectedYear || 'Año'}</span>
-              <ChevronDown 
-                size={16} 
-                className={`text-white/60 ml-auto transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} 
-              />
-            </button>
-            
-            <AnimatePresence>
-              {isDropdownOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                  transition={{ duration: 0.15 }}
-                  className="absolute right-0 mt-2 w-full min-w-[140px] bg-slate-800/95 backdrop-blur-xl 
-                           rounded-xl border border-white/20 shadow-2xl overflow-hidden z-[100]"
+          {/* Selectores de resumen y año */}
+          <div className="flex items-center gap-3">
+            {/* Selector de resumen (solo si hay más de uno) */}
+            {config.summaries.length > 1 && (
+              <div className="relative z-50">
+                <button
+                  onClick={() => setIsSummaryDropdownOpen(!isSummaryDropdownOpen)}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/15 
+                           rounded-xl border border-white/20 transition-all duration-200 min-w-[160px]"
                 >
-                  {availableYears.map((year: number) => (
-                    <button
-                      key={year}
-                      onClick={() => {
-                        setSelectedYear(year);
-                        setIsDropdownOpen(false);
-                      }}
-                      className={`w-full px-4 py-2.5 text-left transition-all duration-150
-                                ${selectedYear === year 
-                                  ? 'bg-emerald-500/20 text-emerald-400' 
-                                  : 'text-white/80 hover:bg-white/10'}`}
+                  <Layers size={16} className="text-indigo-400" />
+                  <span className="text-white font-medium text-sm truncate max-w-[120px]">
+                    {selectedSummary?.title?.replace(/^\d+\.\s*/, '') || 'Resumen'}
+                  </span>
+                  <ChevronDown 
+                    size={16} 
+                    className={`text-white/60 ml-auto transition-transform duration-200 ${isSummaryDropdownOpen ? 'rotate-180' : ''}`} 
+                  />
+                </button>
+                
+                <AnimatePresence>
+                  {isSummaryDropdownOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute right-0 mt-2 w-full min-w-[200px] bg-slate-800/95 backdrop-blur-xl 
+                               rounded-xl border border-white/20 shadow-2xl overflow-hidden z-[100]"
                     >
-                      <div className="flex items-center gap-2">
-                        <div 
-                          className="w-2 h-2 rounded-full" 
-                          style={{ backgroundColor: yearColors[year] }}
-                        />
-                        {year}
-                      </div>
-                    </button>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
+                      {config.summaries.map((summary, index) => (
+                        <button
+                          key={summary.id}
+                          onClick={() => {
+                            setSelectedSummaryIndex(index);
+                            setIsSummaryDropdownOpen(false);
+                          }}
+                          className={`w-full px-4 py-2.5 text-left transition-all duration-150
+                                    ${selectedSummaryIndex === index 
+                                      ? 'bg-indigo-500/20 text-indigo-400' 
+                                      : 'text-white/80 hover:bg-white/10'}`}
+                        >
+                          <span className="text-sm">{summary.title}</span>
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
+
+            {/* Selector de año */}
+            <div className="relative z-50">
+              <button
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/15 
+                         rounded-xl border border-white/20 transition-all duration-200 min-w-[120px]"
+              >
+                <Calendar size={16} className="text-emerald-400" />
+                <span className="text-white font-medium">{selectedYear || 'Año'}</span>
+                <ChevronDown 
+                  size={16} 
+                  className={`text-white/60 ml-auto transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} 
+                />
+              </button>
+              
+              <AnimatePresence>
+                {isDropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 mt-2 w-full min-w-[120px] bg-slate-800/95 backdrop-blur-xl 
+                             rounded-xl border border-white/20 shadow-2xl overflow-hidden z-[100]"
+                  >
+                    {availableYears.map((year: number) => (
+                      <button
+                        key={year}
+                        onClick={() => {
+                          setSelectedYear(year);
+                          setIsDropdownOpen(false);
+                        }}
+                        className={`w-full px-4 py-2.5 text-left transition-all duration-150
+                                  ${selectedYear === year 
+                                    ? 'bg-emerald-500/20 text-emerald-400' 
+                                    : 'text-white/80 hover:bg-white/10'}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-2 h-2 rounded-full" 
+                            style={{ backgroundColor: yearColors[year] }}
+                          />
+                          {year}
+                        </div>
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </div>
 
