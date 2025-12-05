@@ -13,15 +13,16 @@ import {
   Clock,
   Loader2,
   Layers,
-  Sparkles,
-  Trophy,
   Lightbulb,
   Calculator
 } from 'lucide-react';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { KpiDefinition, SectionDefinition } from '@/types/kpi-definitions';
-import { cn } from '@/utils/ui';
+import { KpiValidationPanel } from './KpiValidationPanel';
+import { InsightsPanel } from './InsightsPanel';
+import { ExpandableDataTable } from './ExpandableDataTable';
+import { ProjectionTable } from './ProjectionTable';
 
 interface KpiAnalysisPanelProps {
   config: KpiDefinition;
@@ -538,6 +539,7 @@ export function KpiAnalysisPanel({
   }
 
   return (
+    <>
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -806,6 +808,29 @@ export function KpiAnalysisPanel({
                   </ResponsiveContainer>
                 </div>
               </div>
+
+              {/* Panel de Insights Ejecutivos */}
+              <InsightsPanel
+                config={config}
+                selectedSummaryIndex={selectedSummaryIndex}
+                selectedYear={selectedYear}
+                currentMonth={latestMetrics?.month || initialFilters.mes}
+                accumulatedValue={latestMetrics?.accumulated || 0}
+                metaAnual={metaAnual}
+                formatValue={formatValue}
+                higherIsBetter={higherIsBetter}
+              />
+
+              {/* Panel de Validación Resumen vs Detalle (solo en overview) */}
+              <KpiValidationPanel
+                config={config}
+                selectedYear={selectedYear}
+                currentMonth={latestMetrics?.month || initialFilters.mes}
+                selectedSummaryIndex={selectedSummaryIndex}
+                summaryAccumulated={latestMetrics?.accumulated || 0}
+                summaryMetaAnual={metaAnual}
+                metricLabel={metricLabel}
+              />
             </motion.div>
           )}
 
@@ -858,97 +883,18 @@ export function KpiAnalysisPanel({
                 </div>
               </div>
 
-              {/* Tabla de comparación */}
-              <div className="bg-white/60 backdrop-blur-sm rounded-2xl border border-white/80 shadow-soft overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-slate-50/80">
-                        <th className="text-left text-soft-slate p-3 font-medium">Mes</th>
-                        {[...availableYears].sort((a, b) => a - b).map((year: number) => (
-                          <th key={year} className="text-right text-soft-slate p-3 font-medium">
-                            <div className="flex items-center justify-end gap-2">
-                              <div 
-                                className="w-2.5 h-2.5 rounded-full ring-2 ring-white shadow-sm" 
-                                style={{ backgroundColor: yearColors[year] }}
-                              />
-                              {year}
-                            </div>
-                          </th>
-                        ))}
-                        {/* Columna de Meta del año seleccionado */}
-                        <th className="text-right text-soft-slate p-3 font-medium">
-                          <div className="flex items-center justify-end gap-2">
-                            <Target className="w-3.5 h-3.5 text-plasma-blue" />
-                            <span>Meta {selectedYear}</span>
-                          </div>
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {monthlyChartData.map((row, index) => {
-                        const selectedYearValue = row[`valor_${selectedYear}`] as number | null;
-                        const metaValue = row.meta as number | null;
-                        const metaAchieved = selectedYearValue !== null && metaValue !== null && metaValue > 0 && 
-                          (higherIsBetter ? selectedYearValue >= metaValue : selectedYearValue <= metaValue);
-                        
-                        return (
-                          <tr key={index} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors">
-                            <td className="p-3 text-vision-ink font-medium">{String(row.mes)}</td>
-                            {[...availableYears].sort((a, b) => a - b).map((year: number) => {
-                              const value = row[`valor_${year}`] as number | null;
-                              const isSelectedYear = year === selectedYear;
-                              const achieved = isSelectedYear && metaAchieved;
-                              
-                              return (
-                                <td 
-                                  key={year} 
-                                  className={cn(
-                                    "p-3 text-right transition-all duration-300",
-                                    achieved 
-                                      ? "text-emerald-700 font-semibold" 
-                                      : "text-vision-ink/80"
-                                  )}
-                                >
-                                  <div className={cn(
-                                    "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg transition-all duration-300",
-                                    achieved && "bg-gradient-to-r from-emerald-50 to-green-50 shadow-sm ring-1 ring-emerald-200/50"
-                                  )}>
-                                    {achieved && (
-                                      <Sparkles className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
-                                    )}
-                                    <span>{value !== null ? formatValue(value) : '-'}</span>
-                                  </div>
-                                </td>
-                              );
-                            })}
-                            {/* Columna de Meta */}
-                            <td className={cn(
-                              "p-3 text-right font-medium transition-all duration-300",
-                              metaAchieved 
-                                ? "text-emerald-600" 
-                                : "text-plasma-blue"
-                            )}>
-                              <div className={cn(
-                                "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg transition-all duration-300",
-                                metaAchieved && "bg-gradient-to-r from-emerald-100 to-green-100 shadow-sm ring-1 ring-emerald-300/60"
-                              )}>
-                                {metaAchieved && (
-                                  <Trophy className="w-3.5 h-3.5 text-amber-500" />
-                                )}
-                                <span>{metaValue !== null ? formatValue(metaValue) : '-'}</span>
-                                {metaAchieved && (
-                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              {/* Tabla con Drill-Down por Dimensión - Vista Mensual */}
+              <ExpandableDataTable
+                config={config}
+                selectedSummaryIndex={selectedSummaryIndex}
+                availableYears={availableYears}
+                selectedYear={selectedYear}
+                monthlyData={monthlyChartData}
+                viewType="monthly"
+                formatValue={formatValue}
+                higherIsBetter={higherIsBetter}
+                yearColors={yearColors}
+              />
             </motion.div>
           )}
 
@@ -1024,94 +970,18 @@ export function KpiAnalysisPanel({
                 </div>
               </div>
 
-              {/* Tabla de acumulados */}
-              <div className="bg-white/60 backdrop-blur-sm rounded-2xl border border-white/80 shadow-soft overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-slate-50/80">
-                        <th className="text-left text-soft-slate p-3 font-medium">Mes</th>
-                        {[...availableYears].sort((a, b) => a - b).map((year: number) => (
-                          <th key={year} className="text-right text-soft-slate p-3 font-medium">
-                            <div className="flex items-center justify-end gap-2">
-                              <div 
-                                className="w-2.5 h-2.5 rounded-full ring-2 ring-white shadow-sm" 
-                                style={{ backgroundColor: yearColors[year] }}
-                              />
-                              Acum. {year}
-                            </div>
-                          </th>
-                        ))}
-                        {(metaAnual || accumulatedChartData.some(r => r.meta_acumulada !== null)) && (
-                          <th className="text-right text-amber-600 p-3 font-medium">Meta Acum.</th>
-                        )}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {accumulatedChartData.map((row, index) => {
-                        const selectedYearAccum = row[`acumulado_${selectedYear}`] as number | null;
-                        const metaAcumulada = row.meta_acumulada as number | null;
-                        const metaAchieved = selectedYearAccum !== null && metaAcumulada !== null && metaAcumulada > 0 &&
-                          (higherIsBetter ? selectedYearAccum >= metaAcumulada : selectedYearAccum <= metaAcumulada);
-                        
-                        return (
-                          <tr key={index} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors">
-                            <td className="p-3 text-vision-ink font-medium">{String(row.mes)}</td>
-                            {[...availableYears].sort((a, b) => a - b).map((year: number) => {
-                              const value = row[`acumulado_${year}`] as number | null;
-                              const isSelectedYear = year === selectedYear;
-                              const achieved = isSelectedYear && metaAchieved;
-                              
-                              return (
-                                <td 
-                                  key={year} 
-                                  className={cn(
-                                    "p-3 text-right transition-all duration-300",
-                                    achieved 
-                                      ? "text-emerald-700 font-semibold" 
-                                      : "text-vision-ink/80"
-                                  )}
-                                >
-                                  <div className={cn(
-                                    "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg transition-all duration-300",
-                                    achieved && "bg-gradient-to-r from-emerald-50 to-green-50 shadow-sm ring-1 ring-emerald-200/50"
-                                  )}>
-                                    {achieved && (
-                                      <Sparkles className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
-                                    )}
-                                    <span>{value !== null ? formatValue(value) : '-'}</span>
-                                  </div>
-                                </td>
-                              );
-                            })}
-                            {(metaAnual || accumulatedChartData.some(r => r.meta_acumulada !== null)) && (
-                              <td className={cn(
-                                "p-3 text-right font-medium transition-all duration-300",
-                                metaAchieved 
-                                  ? "text-emerald-600" 
-                                  : "text-amber-600"
-                              )}>
-                                <div className={cn(
-                                  "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg transition-all duration-300",
-                                  metaAchieved && "bg-gradient-to-r from-emerald-100 to-green-100 shadow-sm ring-1 ring-emerald-300/60"
-                                )}>
-                                  {metaAchieved && (
-                                    <Trophy className="w-3.5 h-3.5 text-amber-500" />
-                                  )}
-                                  <span>{metaAcumulada !== null ? formatValue(metaAcumulada) : '-'}</span>
-                                  {metaAchieved && (
-                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                                  )}
-                                </div>
-                              </td>
-                            )}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              {/* Tabla con Drill-Down por Dimensión - Vista Acumulado */}
+              <ExpandableDataTable
+                config={config}
+                selectedSummaryIndex={selectedSummaryIndex}
+                availableYears={availableYears}
+                selectedYear={selectedYear}
+                monthlyData={accumulatedChartData}
+                viewType="accumulated"
+                formatValue={formatValue}
+                higherIsBetter={higherIsBetter}
+                yearColors={yearColors}
+              />
             </motion.div>
           )}
 
@@ -1287,6 +1157,19 @@ export function KpiAnalysisPanel({
                   </motion.div>
                 </div>
               )}
+
+              {/* Tabla de Proyección por Dimensión - Vista Meta Anual */}
+              <ProjectionTable
+                config={config}
+                selectedSummaryIndex={selectedSummaryIndex}
+                selectedYear={selectedYear}
+                currentMonth={latestMetrics?.month || initialFilters.mes}
+                totalAccumulated={latestMetrics?.metaProgress?.current || latestMetrics?.accumulated || 0}
+                totalProjection={latestMetrics?.metaProgress?.projectedAnnual || 0}
+                metaAnual={metaAnual}
+                formatValue={formatValue}
+                higherIsBetter={higherIsBetter}
+              />
             </motion.div>
           )}
         </AnimatePresence>
@@ -1303,6 +1186,7 @@ export function KpiAnalysisPanel({
         )}
       </div>
     </motion.div>
+  </>
   );
 }
 
