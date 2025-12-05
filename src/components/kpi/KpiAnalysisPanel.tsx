@@ -18,7 +18,7 @@ import {
   Lightbulb,
   Calculator
 } from 'lucide-react';
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { KpiDefinition, SectionDefinition } from '@/types/kpi-definitions';
 import { cn } from '@/utils/ui';
@@ -44,6 +44,29 @@ export function KpiAnalysisPanel({
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState<number>(initialFilters.anio);
   const [selectedSummaryIndex, setSelectedSummaryIndex] = useState(0);
+  
+  // Refs para click-outside detection en móvil
+  const summaryDropdownRef = useRef<HTMLDivElement>(null);
+  const yearDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Cerrar dropdowns al hacer click fuera (importante para móvil)
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (summaryDropdownRef.current && !summaryDropdownRef.current.contains(event.target as Node)) {
+        setIsSummaryDropdownOpen(false);
+      }
+      if (yearDropdownRef.current && !yearDropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside as unknown as EventListener);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside as unknown as EventListener);
+    };
+  }, []);
 
   // Resumen seleccionado
   const selectedSummary: SectionDefinition | undefined = config.summaries[selectedSummaryIndex];
@@ -518,7 +541,7 @@ export function KpiAnalysisPanel({
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white/70 backdrop-blur-xl rounded-2xl border border-white/80 shadow-glass overflow-hidden"
+      className="bg-white/70 backdrop-blur-xl rounded-2xl border border-white/80 shadow-glass overflow-visible"
     >
       {/* Header con selector de resumen, año y vistas */}
       <div className="p-4 md:p-5 border-b border-slate-100">
@@ -537,7 +560,7 @@ export function KpiAnalysisPanel({
           <div className="flex items-center gap-2 flex-shrink-0 overflow-x-auto scrollbar-hide">
             {/* Selector de resumen (solo si hay más de uno) */}
             {config.summaries.length > 1 && (
-              <div className="relative z-50 flex-shrink-0">
+              <div ref={summaryDropdownRef} className="relative z-50 flex-shrink-0">
                 <button
                   onClick={() => setIsSummaryDropdownOpen(!isSummaryDropdownOpen)}
                   className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-2 bg-white/80 hover:bg-white 
@@ -585,7 +608,7 @@ export function KpiAnalysisPanel({
             )}
 
             {/* Selector de año */}
-            <div className="relative z-50 flex-shrink-0">
+            <div ref={yearDropdownRef} className="relative z-50 flex-shrink-0">
               <button
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-2 bg-white/80 hover:bg-white 
