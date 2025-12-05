@@ -557,7 +557,7 @@ export function KpiAnalysisPanel({
           </div>
           
           {/* Selectores de resumen y año */}
-          <div className="flex items-center gap-2 flex-shrink-0 overflow-x-auto scrollbar-hide">
+          <div className="flex items-center gap-2 flex-shrink-0">
             {/* Selector de resumen (solo si hay más de uno) */}
             {config.summaries.length > 1 && (
               <div ref={summaryDropdownRef} className="relative z-50 flex-shrink-0">
@@ -576,34 +576,29 @@ export function KpiAnalysisPanel({
                   />
                 </button>
                 
-                <AnimatePresence>
-                  {isSummaryDropdownOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                      transition={{ duration: 0.15 }}
-                      className="absolute right-0 mt-2 w-full min-w-[180px] bg-white/95 backdrop-blur-xl 
-                               rounded-xl border border-slate-200 shadow-xl overflow-hidden z-[100]"
+                {isSummaryDropdownOpen && (
+                  <div
+                    className="absolute left-0 top-full mt-1 w-max min-w-[200px] bg-white 
+                             rounded-xl border border-slate-200 shadow-2xl z-[9999]"
+                    style={{ position: 'absolute' }}
                     >
-                      {config.summaries.map((summary, index) => (
-                        <button
-                          key={summary.id}
-                          onClick={() => {
-                            setSelectedSummaryIndex(index);
-                            setIsSummaryDropdownOpen(false);
-                          }}
-                          className={`w-full px-4 py-2.5 text-left transition-all duration-150
-                                    ${selectedSummaryIndex === index 
-                                      ? 'bg-plasma-blue/10 text-plasma-blue' 
-                                      : 'text-vision-ink hover:bg-slate-50'}`}
-                        >
-                          <span className="text-sm font-medium">{summary.title}</span>
-                        </button>
-                      ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                    {config.summaries.map((summary, index) => (
+                      <button
+                        key={summary.id}
+                        onClick={() => {
+                          setSelectedSummaryIndex(index);
+                          setIsSummaryDropdownOpen(false);
+                        }}
+                        className={`w-full px-4 py-3 text-left transition-all duration-150 first:rounded-t-xl last:rounded-b-xl
+                                  ${selectedSummaryIndex === index 
+                                    ? 'bg-plasma-blue/10 text-plasma-blue' 
+                                    : 'text-vision-ink hover:bg-slate-50 active:bg-slate-100'}`}
+                      >
+                        <span className="text-sm font-medium">{summary.title}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -622,15 +617,11 @@ export function KpiAnalysisPanel({
                 />
               </button>
               
-              <AnimatePresence>
-                {isDropdownOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute right-0 mt-2 w-full min-w-[100px] bg-white/95 backdrop-blur-xl 
-                             rounded-xl border border-slate-200 shadow-xl overflow-hidden z-[100]"
+              {isDropdownOpen && (
+                <div
+                  className="absolute left-0 top-full mt-1 w-max min-w-[120px] bg-white 
+                           rounded-xl border border-slate-200 shadow-2xl z-[9999]"
+                  style={{ position: 'absolute' }}
                   >
                     {availableYears.map((year: number) => (
                       <button
@@ -639,10 +630,10 @@ export function KpiAnalysisPanel({
                           setSelectedYear(year);
                           setIsDropdownOpen(false);
                         }}
-                        className={`w-full px-4 py-2.5 text-left transition-all duration-150
+                        className={`w-full px-4 py-3 text-left transition-all duration-150 first:rounded-t-xl last:rounded-b-xl
                                   ${selectedYear === year 
                                     ? 'bg-plasma-blue/10 text-plasma-blue' 
-                                    : 'text-vision-ink hover:bg-slate-50'}`}
+                                    : 'text-vision-ink hover:bg-slate-50 active:bg-slate-100'}`}
                       >
                         <div className="flex items-center gap-2">
                           <div 
@@ -653,9 +644,8 @@ export function KpiAnalysisPanel({
                         </div>
                       </button>
                     ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                </div>
+              )}
             </div>
           </div>
         </div>
