@@ -65,16 +65,34 @@ export function KpiValidationPanel({
   // Obtener el resumen seleccionado
   const selectedSummary: SectionDefinition | undefined = config.summaries[selectedSummaryIndex];
 
-  // Detectar campo métrico principal del detalle
-  const detailMetricKey = useMemo(() => {
-    if (!selectedDetail?.columns) return 'valor';
+  // Detectar campo métrico principal del detalle y campo de peso
+  const { detailMetricKey, weightKey } = useMemo(() => {
+    if (!selectedDetail?.columns) return { detailMetricKey: 'valor', weightKey: null };
     const excludeFields = ['anio', 'mes', 'meta', 'region', 'plaza', 'entidad', 'producto', 'puesto', 
                           'comite', 'categoria', 'tipo', 'proyecto', 'etapa', 'responsable', 'descripcion',
                           'riesgo', 'observaciones', 'is_current', 'owner_id', 'id', 'created_at'];
-    const metricField = selectedDetail.columns.find(
+    
+    // Campos que típicamente son porcentajes/tasas/índices
+    const percentagePatterns = ['indice', 'ratio', 'porcentaje', 'tasa', 'roe', 'roa', 'margen', 'nps', 'satisfaccion'];
+    // Campos que pueden usarse como peso para promedios ponderados
+    const weightPatterns = ['total', 'monto', 'cartera', 'creditos', 'clientes', 'operaciones', 'cantidad'];
+    
+    // Buscar primero campos de porcentaje
+    const percentageField = selectedDetail.columns.find(
+      col => percentagePatterns.some(pattern => col.toLowerCase().includes(pattern)) &&
+             !excludeFields.includes(col)
+    );
+    
+    const metricField = percentageField || selectedDetail.columns.find(
       col => !excludeFields.includes(col) && !col.startsWith('meta')
     );
-    return metricField || 'valor';
+    
+    // Buscar campo de peso
+    const wtKey = selectedDetail.columns.find(
+      col => weightPatterns.some(pattern => col.toLowerCase().includes(pattern))
+    );
+    
+    return { detailMetricKey: metricField || 'valor', weightKey: wtKey || null };
   }, [selectedDetail]);
 
   // Determinar si es porcentaje
@@ -131,17 +149,54 @@ export function KpiValidationPanel({
     const uniqueMonths = new Set(detailData.map(d => d.mes));
     const monthsCount = uniqueMonths.size;
     
-    const values = detailData.map(d => Number(d[detailMetricKey]) || 0);
-    const metas = detailData.map(d => Number(d.meta) || 0).filter(m => m > 0);
+    let totalValue: number;
+    let totalMeta: number;
     
-    // Para porcentajes: promediar. Para valores: sumar
-    const totalValue = isPercentage 
-      ? values.reduce((a, b) => a + b, 0) / values.length
-      : values.reduce((a, b) => a + b, 0);
-    
-    const totalMeta = isPercentage && metas.length > 0
-      ? metas.reduce((a, b) => a + b, 0) / metas.length
-      : metas.reduce((a, b) => a + b, 0);
+    if (isPercentage) {
+      // Para porcentajes: calcular promedio ponderado por mes
+      // Primero agrupar por mes y calcular promedio ponderado de cada mes
+      const monthlyAverages: Record<number, { weightedSum: number; totalWeight: number; metaSum: number; metaCount: number }> = {};
+      
+      detailData.forEach(d => {
+        const mes = Number(d.mes);
+        const value = Number(d[detailMetricKey]) || 0;
+        const weight = weightKey ? (Number(d[weightKey]) || 1) : 1;
+        const meta = Number(d.meta) || 0;
+        
+        if (!monthlyAverages[mes]) {
+          monthlyAverages[mes] = { weightedSum: 0, totalWeight: 0, metaSum: 0, metaCount: 0 };
+        }
+        
+        monthlyAverages[mes].weightedSum += value * weight;
+        monthlyAverages[mes].totalWeight += weight;
+        if (meta > 0) {
+          monthlyAverages[mes].metaSum += meta;
+          monthlyAverages[mes].metaCount += 1;
+        }
+      });
+      
+      // Calcular el promedio de los promedios mensuales (promedio simple de cada mes)
+      const monthlyValues = Object.values(monthlyAverages).map(m => 
+        m.totalWeight > 0 ? m.weightedSum / m.totalWeight : 0
+      );
+      const monthlyMetas = Object.values(monthlyAverages)
+        .filter(m => m.metaCount > 0)
+        .map(m => m.metaSum / m.metaCount);
+      
+      totalValue = monthlyValues.length > 0 
+        ? monthlyValues.reduce((a, b) => a + b, 0) / monthlyValues.length 
+        : 0;
+      totalMeta = monthlyMetas.length > 0 
+        ? monthlyMetas.reduce((a, b) => a + b, 0) / monthlyMetas.length 
+        : 0;
+    } else {
+      // Para valores absolutos: sumar todo
+      const values = detailData.map(d => Number(d[detailMetricKey]) || 0);
+      const metas = detailData.map(d => Number(d.meta) || 0);
+      
+      totalValue = values.reduce((a, b) => a + b, 0);
+      totalMeta = metas.reduce((a, b) => a + b, 0);
+    }
 
     return {
       value: totalValue,
@@ -149,7 +204,7 @@ export function KpiValidationPanel({
       count: detailData.length,
       months: monthsCount
     };
-  }, [detailData, detailMetricKey, isPercentage]);
+  }, [detailData, detailMetricKey, isPercentage, weightKey]);
 
   // Validación de consistencia del valor acumulado
   const valueValidation = useMemo(() => {

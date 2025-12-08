@@ -74,19 +74,39 @@ export function InsightsPanel({
     return config.details[0];
   }, [config.details, selectedSummaryIndex]);
 
-  // Detectar dimensión principal y campo métrico
-  const { dimensionKey, metricKey } = useMemo(() => {
-    if (!selectedDetail?.columns) return { dimensionKey: '', metricKey: 'valor' };
+  // Detectar dimensión principal, campo métrico y campo de peso
+  const { dimensionKey, metricKey, weightKey, isPercentageMetric } = useMemo(() => {
+    if (!selectedDetail?.columns) return { dimensionKey: '', metricKey: 'valor', weightKey: null, isPercentageMetric: false };
     
     const dimensionPriority = ['region', 'entidad', 'plaza', 'producto', 'tipo', 'comite', 'proyecto'];
     const excludeFields = ['anio', 'mes', 'meta', 'is_current', 'owner_id', 'id', 'created_at'];
+    // Campos que típicamente son porcentajes/tasas/índices - no deben sumarse
+    const percentagePatterns = ['indice', 'ratio', 'porcentaje', 'tasa', 'roe', 'roa', 'margen', 'nps', 'satisfaccion'];
+    // Campos que pueden usarse como peso para promedios ponderados
+    const weightPatterns = ['total', 'monto', 'cartera', 'creditos', 'clientes', 'operaciones', 'cantidad'];
     
     const dimKey = dimensionPriority.find(d => selectedDetail.columns.includes(d)) || '';
-    const metKey = selectedDetail.columns.find(
+    
+    // Buscar primero campos de porcentaje (son los más relevantes como métrica principal)
+    const percentageField = selectedDetail.columns.find(
+      col => percentagePatterns.some(pattern => col.toLowerCase().includes(pattern)) &&
+             !excludeFields.includes(col)
+    );
+    
+    // Si hay campo de porcentaje, usarlo; si no, buscar campo métrico normal
+    const metKey = percentageField || selectedDetail.columns.find(
       col => !excludeFields.includes(col) && !dimensionPriority.includes(col) && !col.startsWith('meta')
     ) || 'valor';
     
-    return { dimensionKey: dimKey, metricKey: metKey };
+    // Detectar si el campo métrico es un porcentaje
+    const isPctMetric = percentagePatterns.some(pattern => metKey.toLowerCase().includes(pattern));
+    
+    // Buscar campo de peso para promedios ponderados
+    const wtKey = isPctMetric 
+      ? selectedDetail.columns.find(col => weightPatterns.some(pattern => col.toLowerCase().includes(pattern)))
+      : null;
+    
+    return { dimensionKey: dimKey, metricKey: metKey, weightKey: wtKey || null, isPercentageMetric: isPctMetric };
   }, [selectedDetail]);
 
   // Cargar datos agrupados por dimensión
@@ -122,40 +142,99 @@ export function InsightsPanel({
         if (prevError) throw prevError;
 
         // Agrupar por dimensión - año actual
-        const currentGrouped: Record<string, { value: number; meta: number }> = {};
+        // Para métricas de porcentaje: calcular promedio ponderado o simple
+        // Para métricas numéricas: sumar valores
+        const currentGrouped: Record<string, { value: number; meta: number; weight: number; count: number }> = {};
         (currentData || []).forEach((row: Record<string, unknown>) => {
           const key = String(row[dimensionKey] || 'Sin clasificar');
           if (!currentGrouped[key]) {
-            currentGrouped[key] = { value: 0, meta: 0 };
+            currentGrouped[key] = { value: 0, meta: 0, weight: 0, count: 0 };
           }
-          currentGrouped[key].value += Number(row[metricKey]) || 0;
+          
+          const metricValue = Number(row[metricKey]) || 0;
+          const weightValue = weightKey ? (Number(row[weightKey]) || 0) : 1;
+          
+          if (isPercentageMetric) {
+            // Para porcentajes: acumular para calcular promedio ponderado
+            currentGrouped[key].value += metricValue * weightValue;
+            currentGrouped[key].weight += weightValue;
+          } else {
+            // Para valores absolutos: sumar directamente
+            currentGrouped[key].value += metricValue;
+          }
           currentGrouped[key].meta += Number(row.meta) || 0;
+          currentGrouped[key].count += 1;
         });
 
         // Agrupar por dimensión - año anterior
-        const prevGrouped: Record<string, number> = {};
+        const prevGrouped: Record<string, { value: number; weight: number; count: number }> = {};
         (prevData || []).forEach((row: Record<string, unknown>) => {
           const key = String(row[dimensionKey] || 'Sin clasificar');
-          prevGrouped[key] = (prevGrouped[key] || 0) + (Number(row[metricKey]) || 0);
+          if (!prevGrouped[key]) {
+            prevGrouped[key] = { value: 0, weight: 0, count: 0 };
+          }
+          
+          const metricValue = Number(row[metricKey]) || 0;
+          const weightValue = weightKey ? (Number(row[weightKey]) || 0) : 1;
+          
+          if (isPercentageMetric) {
+            prevGrouped[key].value += metricValue * weightValue;
+            prevGrouped[key].weight += weightValue;
+          } else {
+            prevGrouped[key].value += metricValue;
+          }
+          prevGrouped[key].count += 1;
         });
 
-        // Calcular totales y porcentajes
-        const total = Object.values(currentGrouped).reduce((sum, d) => sum + d.value, 0);
+        // Calcular valores finales
+        const processedData: Record<string, { value: number; meta: number; weight: number }> = {};
+        Object.entries(currentGrouped).forEach(([key, data]) => {
+          if (isPercentageMetric) {
+            // Para porcentajes: calcular promedio ponderado o simple
+            const finalValue = data.weight > 0 
+              ? data.value / data.weight  // Promedio ponderado
+              : (data.count > 0 ? data.value / data.count : 0); // Promedio simple si no hay peso
+            processedData[key] = { 
+              value: finalValue, 
+              meta: data.count > 0 ? data.meta / data.count : 0, // Promedio de meta
+              weight: data.weight 
+            };
+          } else {
+            processedData[key] = { value: data.value, meta: data.meta, weight: data.weight };
+          }
+        });
+
+        // Para porcentajes: ordenar por valor del porcentaje
+        // Para valores absolutos: ordenar por valor total
+        const total = Object.values(processedData).reduce((sum, d) => sum + (isPercentageMetric ? d.weight : d.value), 0);
         
-        const summaries: DimensionSummary[] = Object.entries(currentGrouped)
+        const summaries: DimensionSummary[] = Object.entries(processedData)
           .map(([name, data]) => {
-            const prevValue = prevGrouped[name] || 0;
+            const prevData = prevGrouped[name];
+            let prevValue = 0;
+            if (prevData) {
+              if (isPercentageMetric) {
+                prevValue = prevData.weight > 0 
+                  ? prevData.value / prevData.weight 
+                  : (prevData.count > 0 ? prevData.value / prevData.count : 0);
+              } else {
+                prevValue = prevData.value;
+              }
+            }
             const change = prevValue > 0 ? ((data.value - prevValue) / prevValue) * 100 : 0;
             
             return {
               name,
               value: data.value,
-              percentage: total > 0 ? (data.value / total) * 100 : 0,
+              // Para porcentajes: usar el peso para calcular la participación
+              percentage: total > 0 ? ((isPercentageMetric ? data.weight : data.value) / total) * 100 : 0,
               trend: Math.abs(change) < 1 ? 'stable' : (change > 0 ? 'up' : 'down') as 'up' | 'down' | 'stable',
               trendValue: change,
               metaCompliance: data.meta > 0 ? (data.value / data.meta) * 100 : null
             };
           })
+          // Para porcentajes: ordenar por valor del índice (mayor es mejor generalmente)
+          // Para valores absolutos: ordenar por valor
           .sort((a, b) => b.value - a.value);
 
         setDimensionData(summaries);
@@ -167,7 +246,7 @@ export function InsightsPanel({
     };
 
     loadData();
-  }, [selectedDetail, dimensionKey, metricKey, selectedYear, currentMonth]);
+  }, [selectedDetail, dimensionKey, metricKey, weightKey, isPercentageMetric, selectedYear, currentMonth]);
 
   // Calcular proyección
   const projection = useMemo(() => {
