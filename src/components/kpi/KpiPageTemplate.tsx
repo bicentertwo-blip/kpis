@@ -11,9 +11,6 @@ import {
   FileText, 
   Upload,
   Calendar,
-  CheckCircle2,
-  Circle,
-  Lightbulb,
   Database,
   BarChart3,
 } from 'lucide-react'
@@ -302,140 +299,64 @@ export const KpiPageTemplate = ({ config }: KpiPageTemplateProps) => {
       {/* Header del KPI */}
       <KpiHeaderNew config={config} status="in_progress" />
 
-      {/* Layout principal */}
-      <div className="grid gap-4 sm:gap-5 lg:gap-6 xl:grid-cols-[1fr,380px] 2xl:grid-cols-[1fr,420px]">
-        {/* Área principal */}
-        <div className="space-y-4 sm:space-y-5">
-          {/* Tabs de navegación */}
+      {/* Barra de navegación con período */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+        {/* Tabs de navegación - Ocupa todo el ancho en móvil */}
+        <div className="flex-1 min-w-0">
           {renderTabNav()}
-
-          {/* Contenido según tab activo */}
-          <AnimatePresence mode="wait">
-            {activeTab === 'analysis' ? (
-              <motion.div
-                key="analysis"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-              >
-                <KpiAnalysisPanel 
-                  config={config}
-                  filters={{ anio: selectedYear, mes: selectedMonth }}
-                />
-              </motion.div>
-            ) : activeTab === 'summary' ? (
-              <motion.div
-                key="summary"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-              >
-                {renderSummaryContent()}
-              </motion.div>
-            ) : (
-              <motion.div
-                key="detail"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-              >
-                {renderDetailContent()}
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
-
-        {/* Sidebar */}
-        <div className="space-y-4 sm:space-y-5">
-          {/* Período seleccionado */}
-          <GlassCard delay={0.05}>
-            <div className="flex items-start gap-3">
-              <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-plasma-blue/10 text-plasma-blue flex-shrink-0">
-                <Calendar className="size-5" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-vision-ink">Período Actual</p>
-                <p className="text-xs text-soft-slate mt-1">
-                  {new Date(selectedYear, selectedMonth - 1).toLocaleDateString('es-MX', { 
-                    month: 'long', 
-                    year: 'numeric' 
-                  })}
-                </p>
-              </div>
-            </div>
-          </GlassCard>
-
-          {/* Progreso de secciones */}
-          <GlassCard delay={0.1}>
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="size-5 text-plasma-blue" />
-                <p className="text-sm font-semibold text-vision-ink">Progreso de captura</p>
-              </div>
-              
-              <div className="space-y-2">
-                {hasSummaries && (
-                  <div className="flex items-center gap-3 p-2 rounded-lg bg-white/30">
-                    <FileText className="size-4 text-soft-slate" />
-                    <span className="text-xs text-soft-slate flex-1">Resúmenes</span>
-                    <span className="text-xs font-medium text-vision-ink">
-                      {config.summaries.length} sección{config.summaries.length > 1 ? 'es' : ''}
-                    </span>
-                  </div>
-                )}
-                
-                {hasDetails && (
-                  <div className="flex items-center gap-3 p-2 rounded-lg bg-white/30">
-                    <Upload className="size-4 text-soft-slate" />
-                    <span className="text-xs text-soft-slate flex-1">Detalles Excel</span>
-                    <span className="text-xs font-medium text-vision-ink">
-                      {config.details.length} layout{config.details.length > 1 ? 's' : ''}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </GlassCard>
-
-          {/* Tips */}
-          <GlassCard delay={0.15}>
-            <div className="flex items-start gap-3">
-              <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-amber-100/80 text-amber-600 flex-shrink-0">
-                <Lightbulb className="size-5" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-vision-ink">Tip rápido</p>
-                <p className="text-xs text-soft-slate mt-1 leading-relaxed">
-                  {activeTab === 'analysis'
-                    ? 'Visualiza tendencias y métricas clave. Alterna entre la vista resumida y el análisis detallado.'
-                    : activeTab === 'summary' 
-                    ? 'Los datos se guardan automáticamente. Completa todos los campos requeridos marcados con *.'
-                    : 'Descarga el layout vacío, llénalo en Excel y vuelve a importarlo. Asegúrate de no cambiar los encabezados.'}
-                </p>
-              </div>
-            </div>
-          </GlassCard>
-
-          {/* Leyenda de estados */}
-          <GlassCard delay={0.2} padding="sm">
-            <p className="text-xs font-medium text-vision-ink mb-2">Estados</p>
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2">
-                <Circle className="size-3 text-soft-slate/50" />
-                <span className="text-xs text-soft-slate">Sin iniciar</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full border-2 border-plasma-blue" />
-                <span className="text-xs text-soft-slate">En progreso</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="size-3 text-emerald-500" />
-                <span className="text-xs text-soft-slate">Completado</span>
-              </div>
-            </div>
-          </GlassCard>
+        
+        {/* Badge de período - Compacto y elegante */}
+        <div className="flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2.5 
+                        bg-white/60 backdrop-blur-sm rounded-xl border border-white/50
+                        shadow-soft flex-shrink-0">
+          <Calendar className="size-4 text-plasma-blue" />
+          <span className="text-sm font-medium text-vision-ink capitalize">
+            {new Date(selectedYear, selectedMonth - 1).toLocaleDateString('es-MX', { 
+              month: 'short', 
+              year: 'numeric' 
+            })}
+          </span>
         </div>
       </div>
+
+      {/* Contenido principal - Ancho completo */}
+      <AnimatePresence mode="wait">
+        {activeTab === 'analysis' ? (
+          <motion.div
+            key="analysis"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+          >
+            <KpiAnalysisPanel 
+              config={config}
+              filters={{ anio: selectedYear, mes: selectedMonth }}
+            />
+          </motion.div>
+        ) : activeTab === 'summary' ? (
+          <motion.div
+            key="summary"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+          >
+            {renderSummaryContent()}
+          </motion.div>
+        ) : (
+          <motion.div
+            key="detail"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+          >
+            {renderDetailContent()}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.section>
   )
 }
