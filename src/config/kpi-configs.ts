@@ -765,6 +765,7 @@ export const ESCALABILIDAD_CONFIG: KpiDefinition = {
       title: '1. Procesos Digitalizados',
       description: 'Porcentaje de procesos digitalizados',
       tableName: 'kpi_escalabilidad_resumen_1',
+      aggregationType: 'avg',
       fields: [
         campoAnio,
         campoMes,
@@ -784,6 +785,7 @@ export const ESCALABILIDAD_CONFIG: KpiDefinition = {
       title: '2. Transacciones Automáticas',
       description: 'Porcentaje de transacciones automatizadas',
       tableName: 'kpi_escalabilidad_resumen_2',
+      aggregationType: 'avg',
       fields: [
         campoAnio,
         campoMes,
@@ -803,6 +805,8 @@ export const ESCALABILIDAD_CONFIG: KpiDefinition = {
       title: '3. Cost to Serve',
       description: 'Costo por cliente atendido',
       tableName: 'kpi_escalabilidad_resumen_3',
+      aggregationType: 'avg',
+      higherIsBetter: false, // Menor costo es mejor
       fields: [
         campoAnio,
         campoMes,
@@ -822,23 +826,23 @@ export const ESCALABILIDAD_CONFIG: KpiDefinition = {
     {
       id: 'detalle-procesos',
       title: '1. Detalle Procesos',
-      description: 'Excel con procesos por entidad/plaza',
+      description: 'Excel con procesos digitalizados por Plaza, Macro-Proceso, Proceso y Sub-Proceso',
       tableName: 'kpi_escalabilidad_detalle_1',
-      columns: ['anio', 'mes', 'entidad', 'plaza', 'procesos_digitalizados', 'meta'],
+      columns: ['anio', 'mes', 'plaza', 'macro_proceso', 'proceso', 'sub_proceso', 'procesos_digitalizados', 'meta'],
     },
     {
       id: 'detalle-transacciones',
       title: '2. Detalle Transacciones',
-      description: 'Excel con transacciones por entidad/plaza',
+      description: 'Excel con transacciones automáticas por Plaza, Macro-Proceso, Proceso y Sub-Proceso',
       tableName: 'kpi_escalabilidad_detalle_2',
-      columns: ['anio', 'mes', 'entidad', 'plaza', 'transacciones_automaticas', 'meta'],
+      columns: ['anio', 'mes', 'plaza', 'macro_proceso', 'proceso', 'sub_proceso', 'transacciones_automaticas', 'meta'],
     },
     {
       id: 'detalle-cost-to-serve',
       title: '3. Detalle Cost to Serve',
-      description: 'Excel con costos por entidad/plaza',
+      description: 'Excel con costos por Plaza y Servicio',
       tableName: 'kpi_escalabilidad_detalle_3',
-      columns: ['anio', 'mes', 'entidad', 'plaza', 'cost_to_serve', 'meta'],
+      columns: ['anio', 'mes', 'plaza', 'servicio', 'cost_to_serve', 'meta'],
     },
   ],
 }

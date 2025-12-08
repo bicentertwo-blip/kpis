@@ -21,7 +21,11 @@ import {
   Building2,
   Package,
   Users,
-  AlertCircle
+  AlertCircle,
+  Workflow,
+  Cog,
+  GitBranch,
+  Briefcase
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { KpiDefinition, DetailLayoutDefinition } from '@/types/kpi-definitions';
@@ -64,16 +68,25 @@ interface DetailDataByMonth {
 
 // Configuración de dimensiones con jerarquía
 const DIMENSION_HIERARCHY: Record<string, DimensionConfig> = {
+  // Dimensiones geográficas
   entidad: { key: 'entidad', label: 'Entidad', icon: Building2, priority: 1 },
   region: { key: 'region', label: 'Región', icon: MapPin, priority: 2 },
   plaza: { key: 'plaza', label: 'Plaza', icon: Building2, priority: 3 },
+  // Dimensiones de producto/servicio
   producto: { key: 'producto', label: 'Producto', icon: Package, priority: 4 },
-  puesto: { key: 'puesto', label: 'Puesto', icon: Users, priority: 5 },
-  comite: { key: 'comite', label: 'Comité', icon: Users, priority: 6 },
-  categoria: { key: 'categoria', label: 'Categoría', icon: Layers, priority: 7 },
-  tipo: { key: 'tipo', label: 'Tipo', icon: Layers, priority: 8 },
-  proyecto: { key: 'proyecto', label: 'Proyecto', icon: Layers, priority: 9 },
-  etapa: { key: 'etapa', label: 'Etapa', icon: Layers, priority: 10 },
+  servicio: { key: 'servicio', label: 'Servicio', icon: Briefcase, priority: 5 },
+  // Dimensiones de proceso (Escalabilidad)
+  macro_proceso: { key: 'macro_proceso', label: 'Macro-Proceso', icon: Workflow, priority: 6 },
+  proceso: { key: 'proceso', label: 'Proceso', icon: Cog, priority: 7 },
+  sub_proceso: { key: 'sub_proceso', label: 'Sub-Proceso', icon: GitBranch, priority: 8 },
+  // Dimensiones organizacionales
+  puesto: { key: 'puesto', label: 'Puesto', icon: Users, priority: 9 },
+  comite: { key: 'comite', label: 'Comité', icon: Users, priority: 10 },
+  // Dimensiones generales
+  categoria: { key: 'categoria', label: 'Categoría', icon: Layers, priority: 11 },
+  tipo: { key: 'tipo', label: 'Tipo', icon: Layers, priority: 12 },
+  proyecto: { key: 'proyecto', label: 'Proyecto', icon: Layers, priority: 13 },
+  etapa: { key: 'etapa', label: 'Etapa', icon: Layers, priority: 14 },
 };
 
 // Colores para niveles de profundidad

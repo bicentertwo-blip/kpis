@@ -78,10 +78,14 @@ export function InsightsPanel({
   const { dimensionKey, metricKey, weightKey, isPercentageMetric } = useMemo(() => {
     if (!selectedDetail?.columns) return { dimensionKey: '', metricKey: 'valor', weightKey: null, isPercentageMetric: false };
     
-    const dimensionPriority = ['region', 'entidad', 'plaza', 'producto', 'tipo', 'comite', 'proyecto'];
+    // Dimensiones en orden de prioridad (la primera que se encuentre será la principal)
+    const dimensionPriority = [
+      'region', 'entidad', 'plaza', 'producto', 'tipo', 'comite', 'proyecto',
+      'macro_proceso', 'proceso', 'sub_proceso', 'servicio', 'categoria', 'puesto'
+    ];
     const excludeFields = ['anio', 'mes', 'meta', 'is_current', 'owner_id', 'id', 'created_at'];
     // Campos que típicamente son porcentajes/tasas/índices - no deben sumarse
-    const percentagePatterns = ['indice', 'ratio', 'porcentaje', 'tasa', 'roe', 'roa', 'margen', 'nps', 'satisfaccion'];
+    const percentagePatterns = ['indice', 'ratio', 'porcentaje', 'tasa', 'roe', 'roa', 'margen', 'nps', 'satisfaccion', 'digitalizados', 'automaticas'];
     // Campos que pueden usarse como peso para promedios ponderados
     const weightPatterns = ['total', 'monto', 'cartera', 'creditos', 'clientes', 'operaciones', 'cantidad'];
     

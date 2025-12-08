@@ -62,6 +62,11 @@ export const COLUMN_LABELS: Record<string, string> = {
   dias_sin_cubrir: 'Días sin Cubrir',
   ausentismo: 'Ausentismo',
   permanencia_12m: 'Permanencia 12M',
+  // Escalabilidad - Campos nuevos
+  macro_proceso: 'Macro-Proceso',
+  proceso: 'Proceso',
+  sub_proceso: 'Sub-Proceso',
+  servicio: 'Servicio',
   procesos_digitalizados: 'Procesos Digitalizados',
   transacciones_automaticas: 'Transacciones Automáticas',
   cost_to_serve: 'Cost to Serve',

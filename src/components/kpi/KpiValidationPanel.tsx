@@ -70,10 +70,11 @@ export function KpiValidationPanel({
     if (!selectedDetail?.columns) return { detailMetricKey: 'valor', weightKey: null };
     const excludeFields = ['anio', 'mes', 'meta', 'region', 'plaza', 'entidad', 'producto', 'puesto', 
                           'comite', 'categoria', 'tipo', 'proyecto', 'etapa', 'responsable', 'descripcion',
-                          'riesgo', 'observaciones', 'is_current', 'owner_id', 'id', 'created_at'];
+                          'riesgo', 'observaciones', 'is_current', 'owner_id', 'id', 'created_at',
+                          'macro_proceso', 'proceso', 'sub_proceso', 'servicio'];
     
     // Campos que típicamente son porcentajes/tasas/índices
-    const percentagePatterns = ['indice', 'ratio', 'porcentaje', 'tasa', 'roe', 'roa', 'margen', 'nps', 'satisfaccion'];
+    const percentagePatterns = ['indice', 'ratio', 'porcentaje', 'tasa', 'roe', 'roa', 'margen', 'nps', 'satisfaccion', 'digitalizados', 'automaticas'];
     // Campos que pueden usarse como peso para promedios ponderados
     const weightPatterns = ['total', 'monto', 'cartera', 'creditos', 'clientes', 'operaciones', 'cantidad'];
     
