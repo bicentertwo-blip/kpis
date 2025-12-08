@@ -162,15 +162,35 @@ export function ExpandableDataTable({
     return availableDimensions.slice(selectedIndex);
   }, [availableDimensions, selectedDimensionKey]);
 
-  // Detectar campo métrico principal
-  const metricKey = useMemo(() => {
-    if (!selectedDetail?.columns) return 'valor';
+  // Detectar campo métrico principal y si es porcentaje
+  const { metricKey, isPercentageMetric, weightKey } = useMemo(() => {
+    if (!selectedDetail?.columns) return { metricKey: 'valor', isPercentageMetric: false, weightKey: null };
+    
     const excludeFields = ['anio', 'mes', 'meta', 'is_current', 'owner_id', 'id', 'created_at',
                           ...Object.keys(DIMENSION_HIERARCHY)];
-    const metricField = selectedDetail.columns.find(
-      col => !excludeFields.includes(col) && !col.startsWith('meta')
+    // Campos que típicamente son porcentajes/tasas/índices
+    const percentagePatterns = ['indice', 'ratio', 'porcentaje', 'tasa', 'roe', 'roa', 'margen', 'nps', 'satisfaccion'];
+    // Campos que pueden usarse como peso para promedios ponderados
+    const weightPatterns = ['total', 'monto', 'cartera', 'creditos', 'clientes', 'operaciones', 'cantidad'];
+    
+    // Buscar primero campos de porcentaje
+    const percentageField = selectedDetail.columns.find(
+      col => percentagePatterns.some(pattern => col.toLowerCase().includes(pattern)) &&
+             !excludeFields.includes(col)
     );
-    return metricField || 'valor';
+    
+    const metKey = percentageField || selectedDetail.columns.find(
+      col => !excludeFields.includes(col) && !col.startsWith('meta')
+    ) || 'valor';
+    
+    const isPctMetric = percentagePatterns.some(pattern => metKey.toLowerCase().includes(pattern));
+    
+    // Buscar campo de peso
+    const wtKey = isPctMetric 
+      ? selectedDetail.columns.find(col => weightPatterns.some(pattern => col.toLowerCase().includes(pattern)))
+      : null;
+    
+    return { metricKey: metKey, isPercentageMetric: isPctMetric, weightKey: wtKey || null };
   }, [selectedDetail]);
 
   // Cargar datos de detalle para un mes
@@ -274,15 +294,41 @@ export function ExpandableDataTable({
       return true;
     });
 
+    // Detectar si los valores necesitan escalado (decimal 0-1 vs porcentaje 0-100)
+    let scaleFactor = 1;
+    if (isPercentageMetric && filtered.length > 0) {
+      const metricValues = filtered
+        .map(row => Number(row[metricKey]) || 0)
+        .filter(v => v > 0);
+      if (metricValues.length > 0) {
+        const avgValue = metricValues.reduce((a, b) => a + b, 0) / metricValues.length;
+        if (avgValue < 2) {
+          scaleFactor = 100;
+        }
+      }
+    }
+
     // Agrupar por dimensión
-    const grouped: Record<string, { value: number; meta: number | null; count: number }> = {};
+    const grouped: Record<string, { value: number; weight: number; meta: number | null; count: number }> = {};
     
     filtered.forEach(row => {
       const dimValue = String(row[dimensionKey] || 'Sin clasificar');
       if (!grouped[dimValue]) {
-        grouped[dimValue] = { value: 0, meta: null, count: 0 };
+        grouped[dimValue] = { value: 0, weight: 0, meta: null, count: 0 };
       }
-      grouped[dimValue].value += Number(row[metricKey]) || 0;
+      
+      const rawValue = (Number(row[metricKey]) || 0) * scaleFactor;
+      const weightValue = weightKey ? (Number(row[weightKey]) || 1) : 1;
+      
+      if (isPercentageMetric) {
+        // Para porcentajes: acumular para promedio ponderado
+        grouped[dimValue].value += rawValue * weightValue;
+        grouped[dimValue].weight += weightValue;
+      } else {
+        // Para valores absolutos: sumar directamente
+        grouped[dimValue].value += rawValue;
+      }
+      
       if (row.meta !== null && row.meta !== undefined) {
         grouped[dimValue].meta = (grouped[dimValue].meta || 0) + Number(row.meta);
       }
@@ -290,9 +336,23 @@ export function ExpandableDataTable({
     });
 
     return Object.entries(grouped)
-      .map(([name, data]) => ({ name, ...data }))
+      .map(([name, data]) => {
+        // Calcular valor final
+        const finalValue = isPercentageMetric && data.weight > 0
+          ? data.value / data.weight  // Promedio ponderado
+          : data.value;
+        
+        return { 
+          name, 
+          value: finalValue,
+          meta: isPercentageMetric && data.count > 0 && data.meta !== null
+            ? data.meta / data.count  // Promedio de meta para porcentajes
+            : data.meta,
+          count: data.count 
+        };
+      })
       .sort((a, b) => b.value - a.value);
-  }, [metricKey, viewType]);
+  }, [metricKey, viewType, isPercentageMetric, weightKey]);
 
   // Renderizar icono de tendencia
   const renderTrend = (current: number | null, previous: number | null) => {

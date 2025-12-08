@@ -145,12 +145,21 @@ export function InsightsPanel({
         // Para métricas de porcentaje: calcular promedio ponderado o simple
         // Para métricas numéricas: sumar valores
         // Detectar si los valores de detalle están en escala decimal (0-1) vs porcentaje (0-100)
-        const needsScaling = isPercentageMetric && currentData && currentData.length > 0 && 
-          currentData.every((row: Record<string, unknown>) => {
-            const val = Number(row[metricKey]) || 0;
-            return val >= 0 && val <= 1.5; // Si todos los valores están entre 0 y 1.5, están en escala decimal
-          });
-        const scaleFactor = needsScaling ? 100 : 1;
+        // Usamos el promedio de valores no-cero para determinar la escala
+        let scaleFactor = 1;
+        if (isPercentageMetric && currentData && currentData.length > 0) {
+          const metricValues = (currentData as Record<string, unknown>[])
+            .map(row => Number(row[metricKey]) || 0)
+            .filter(v => v > 0);
+          if (metricValues.length > 0) {
+            const avgValue = metricValues.reduce((a, b) => a + b, 0) / metricValues.length;
+            // Si el promedio es menor a 2, los valores están en escala decimal (0-1)
+            // y necesitan multiplicarse por 100
+            if (avgValue < 2) {
+              scaleFactor = 100;
+            }
+          }
+        }
         
         const currentGrouped: Record<string, { value: number; meta: number; weight: number; count: number }> = {};
         (currentData || []).forEach((row: Record<string, unknown>) => {
@@ -174,13 +183,19 @@ export function InsightsPanel({
           currentGrouped[key].count += 1;
         });
 
-        // Detectar escala para datos del año anterior
-        const needsScalingPrev = isPercentageMetric && prevData && prevData.length > 0 && 
-          prevData.every((row: Record<string, unknown>) => {
-            const val = Number(row[metricKey]) || 0;
-            return val >= 0 && val <= 1.5;
-          });
-        const scaleFactorPrev = needsScalingPrev ? 100 : 1;
+        // Detectar escala para datos del año anterior (usar misma lógica basada en promedio)
+        let scaleFactorPrev = 1;
+        if (isPercentageMetric && prevData && prevData.length > 0) {
+          const prevMetricValues = (prevData as Record<string, unknown>[])
+            .map(row => Number(row[metricKey]) || 0)
+            .filter(v => v > 0);
+          if (prevMetricValues.length > 0) {
+            const avgPrevValue = prevMetricValues.reduce((a, b) => a + b, 0) / prevMetricValues.length;
+            if (avgPrevValue < 2) {
+              scaleFactorPrev = 100;
+            }
+          }
+        }
 
         // Agrupar por dimensión - año anterior
         const prevGrouped: Record<string, { value: number; weight: number; count: number }> = {};

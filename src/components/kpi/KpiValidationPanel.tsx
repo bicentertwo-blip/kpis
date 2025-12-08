@@ -153,12 +153,20 @@ export function KpiValidationPanel({
     let totalMeta: number;
     
     // Detectar si los valores de detalle están en escala decimal (0-1) vs porcentaje (0-100)
-    const needsScaling = isPercentage && detailData.length > 0 && 
-      detailData.every(d => {
-        const val = Number(d[detailMetricKey]) || 0;
-        return val >= 0 && val <= 1.5; // Si todos los valores están entre 0 y 1.5, están en escala decimal
-      });
-    const scaleFactor = needsScaling ? 100 : 1;
+    // Usamos el promedio de valores no-cero para determinar la escala
+    let scaleFactor = 1;
+    if (isPercentage && detailData.length > 0) {
+      const metricValues = detailData
+        .map(d => Number(d[detailMetricKey]) || 0)
+        .filter(v => v > 0);
+      if (metricValues.length > 0) {
+        const avgValue = metricValues.reduce((a, b) => a + b, 0) / metricValues.length;
+        // Si el promedio es menor a 2, los valores están en escala decimal
+        if (avgValue < 2) {
+          scaleFactor = 100;
+        }
+      }
+    }
     
     if (isPercentage) {
       // Para porcentajes: calcular promedio ponderado por mes
