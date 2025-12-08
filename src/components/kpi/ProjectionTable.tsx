@@ -151,15 +151,35 @@ export function ProjectionTable({
     }
   }, [availableDimensions, selectedDimensionKey]);
 
-  // Campo métrico
-  const metricKey = useMemo(() => {
-    if (!selectedDetail?.columns) return 'valor';
+  // Campo métrico y configuración para porcentajes
+  const { metricKey, isPercentageMetric, weightKey } = useMemo(() => {
+    if (!selectedDetail?.columns) return { metricKey: 'valor', isPercentageMetric: false, weightKey: null };
+    
     const excludeFields = ['anio', 'mes', 'meta', 'is_current', 'owner_id', 'id', 'created_at',
                           ...Object.keys(DIMENSION_HIERARCHY)];
-    const metricField = selectedDetail.columns.find(
-      col => !excludeFields.includes(col) && !col.startsWith('meta')
+    // Campos que típicamente son porcentajes/tasas/índices
+    const percentagePatterns = ['indice', 'ratio', 'porcentaje', 'tasa', 'roe', 'roa', 'margen', 'nps', 'satisfaccion'];
+    // Campos que pueden usarse como peso para promedios ponderados
+    const weightPatterns = ['total', 'monto', 'cartera', 'creditos', 'clientes', 'operaciones', 'cantidad'];
+    
+    // Buscar primero campos de porcentaje
+    const percentageField = selectedDetail.columns.find(
+      col => percentagePatterns.some(pattern => col.toLowerCase().includes(pattern)) &&
+             !excludeFields.includes(col)
     );
-    return metricField || 'valor';
+    
+    const metKey = percentageField || selectedDetail.columns.find(
+      col => !excludeFields.includes(col) && !col.startsWith('meta')
+    ) || 'valor';
+    
+    const isPctMetric = percentagePatterns.some(pattern => metKey.toLowerCase().includes(pattern));
+    
+    // Buscar campo de peso
+    const wtKey = isPctMetric 
+      ? selectedDetail.columns.find(col => weightPatterns.some(pattern => col.toLowerCase().includes(pattern)))
+      : null;
+    
+    return { metricKey: metKey, isPercentageMetric: isPctMetric, weightKey: wtKey || null };
   }, [selectedDetail]);
 
   // Cargar datos
@@ -198,7 +218,25 @@ export function ProjectionTable({
   ): DimensionProjection[] => {
     if (detailData.length === 0 || currentMonth === 0) return [];
 
-    const grouped: Record<string, { accumulated: number; meta: number }> = {};
+    // Detectar escala de los valores (decimal 0-1 vs porcentaje 0-100)
+    let scaleFactor = 1;
+    if (isPercentageMetric && detailData.length > 0) {
+      const metricValues = detailData
+        .map(row => Number(row[metricKey]) || 0)
+        .filter(v => v > 0);
+      if (metricValues.length > 0) {
+        const avgValue = metricValues.reduce((a, b) => a + b, 0) / metricValues.length;
+        if (avgValue < 2) {
+          scaleFactor = 100;
+        }
+      }
+    }
+
+    // Para porcentajes: agrupar por mes primero, luego promediar
+    // Para valores absolutos: sumar directamente
+    const grouped: Record<string, { 
+      monthlyValues: Record<number, { weightedSum: number; totalWeight: number; metaSum: number; metaCount: number }>;
+    }> = {};
     
     detailData.forEach(row => {
       // Aplicar filtros padre
@@ -209,21 +247,66 @@ export function ProjectionTable({
       if (!matches) return;
 
       const dimValue = String(row[dimensionKey] || 'Sin clasificar');
+      const mes = Number(row.mes);
+      
       if (!grouped[dimValue]) {
-        grouped[dimValue] = { accumulated: 0, meta: 0 };
+        grouped[dimValue] = { monthlyValues: {} };
       }
-      grouped[dimValue].accumulated += Number(row[metricKey]) || 0;
-      grouped[dimValue].meta += Number(row.meta) || 0;
+      if (!grouped[dimValue].monthlyValues[mes]) {
+        grouped[dimValue].monthlyValues[mes] = { weightedSum: 0, totalWeight: 0, metaSum: 0, metaCount: 0 };
+      }
+      
+      const rawValue = (Number(row[metricKey]) || 0) * scaleFactor;
+      const weight = weightKey ? (Number(row[weightKey]) || 1) : 1;
+      const meta = Number(row.meta) || 0;
+      
+      if (isPercentageMetric) {
+        grouped[dimValue].monthlyValues[mes].weightedSum += rawValue * weight;
+        grouped[dimValue].monthlyValues[mes].totalWeight += weight;
+      } else {
+        grouped[dimValue].monthlyValues[mes].weightedSum += rawValue;
+        grouped[dimValue].monthlyValues[mes].totalWeight += 1;
+      }
+      
+      if (meta > 0) {
+        grouped[dimValue].monthlyValues[mes].metaSum += meta;
+        grouped[dimValue].monthlyValues[mes].metaCount += 1;
+      }
     });
 
     return Object.entries(grouped)
       .map(([name, data]) => {
-        // Calcular proyección anual
-        const monthlyAvg = data.accumulated / currentMonth;
-        const projection = monthlyAvg * 12;
+        const months = Object.values(data.monthlyValues);
         
-        // Meta anual (si hay meta mensual, multiplicar por 12)
-        const annualMeta = data.meta > 0 ? (data.meta / currentMonth) * 12 : null;
+        let accumulated: number;
+        let projection: number;
+        let annualMeta: number | null = null;
+        
+        if (isPercentageMetric) {
+          // Para porcentajes: calcular promedio ponderado de cada mes, luego promediar los meses
+          const monthlyAvgs = months.map(m => 
+            m.totalWeight > 0 ? m.weightedSum / m.totalWeight : 0
+          );
+          accumulated = monthlyAvgs.length > 0 
+            ? monthlyAvgs.reduce((a, b) => a + b, 0) / monthlyAvgs.length 
+            : 0;
+          // La proyección para porcentajes es igual al acumulado (es un promedio)
+          projection = accumulated;
+          
+          // Meta anual: promedio de las metas mensuales
+          const monthlyMetas = months.filter(m => m.metaCount > 0).map(m => m.metaSum / m.metaCount);
+          annualMeta = monthlyMetas.length > 0 
+            ? monthlyMetas.reduce((a, b) => a + b, 0) / monthlyMetas.length 
+            : null;
+        } else {
+          // Para valores absolutos: sumar y proyectar
+          accumulated = months.reduce((sum, m) => sum + m.weightedSum, 0);
+          const monthlyAvg = accumulated / currentMonth;
+          projection = monthlyAvg * 12;
+          
+          const totalMeta = months.reduce((sum, m) => sum + m.metaSum, 0);
+          annualMeta = totalMeta > 0 ? (totalMeta / currentMonth) * 12 : null;
+        }
         
         // Cumplimiento proyectado
         const compliance = annualMeta ? (projection / annualMeta) * 100 : null;
@@ -240,15 +323,15 @@ export function ProjectionTable({
 
         return {
           name,
-          accumulated: data.accumulated,
+          accumulated,
           projection,
           meta: annualMeta,
           compliance,
           status
         };
       })
-      .sort((a, b) => b.projection - a.projection);
-  }, [detailData, currentMonth, metricKey, higherIsBetter]);
+      .sort((a, b) => b.accumulated - a.accumulated);
+  }, [detailData, currentMonth, metricKey, higherIsBetter, isPercentageMetric, weightKey]);
 
   // Toggle expansión
   const toggleDimension = (key: string) => {
