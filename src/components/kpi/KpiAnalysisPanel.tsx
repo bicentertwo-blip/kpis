@@ -621,10 +621,10 @@ export function KpiAnalysisPanel({
                 <button
                   onClick={() => setIsSummaryDropdownOpen(!isSummaryDropdownOpen)}
                   className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-2 bg-white/80 hover:bg-white 
-                           rounded-xl border border-slate-200 transition-all duration-200 min-w-[120px] md:min-w-[180px] shadow-soft"
+                           rounded-xl border border-slate-200 transition-all duration-200 min-w-[160px] md:min-w-[220px] shadow-soft"
                 >
                   <Layers size={14} className="text-plasma-indigo flex-shrink-0" />
-                  <span className="text-vision-ink font-medium text-xs md:text-sm truncate max-w-[80px] md:max-w-[140px]">
+                  <span className="text-vision-ink font-medium text-xs md:text-sm truncate max-w-[120px] md:max-w-[180px]">
                     {selectedSummary?.title?.replace(/^\d+\.\s*/, '') || 'Resumen'}
                   </span>
                   <ChevronDown 
