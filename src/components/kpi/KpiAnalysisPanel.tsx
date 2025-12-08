@@ -98,6 +98,7 @@ export function KpiAnalysisPanel({
   // Determinar si es porcentaje o índice (para saber si promediar o sumar)
   const isPercentage = fieldType === 'percentage';
   const isIndex = fieldType === 'index';
+  const isNumber = fieldType === 'number'; // Números simples (personas, cantidad, etc.)
   const shouldAverage = isPercentage || isIndex;
 
   // Determinar tipo de agregación: si tiene aggregationType explícito, usarlo; sino, avg para porcentaje/index, sum para el resto
@@ -118,8 +119,10 @@ export function KpiAnalysisPanel({
     if (v === null || v === undefined) return '-';
     if (isPercentage) return `${v.toFixed(2)}%`;
     if (isIndex) return v.toFixed(1); // Formato de índice: número con 1 decimal
+    if (isNumber) return v.toLocaleString('es-MX'); // Número con separadores de miles, sin símbolo
+    // Default: moneda
     return v.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 0 });
-  }, [isPercentage, isIndex]);
+  }, [isPercentage, isIndex, isNumber]);
 
   // Cargar datos del resumen seleccionado
   useEffect(() => {
