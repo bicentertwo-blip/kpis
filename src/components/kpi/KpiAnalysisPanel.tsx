@@ -554,8 +554,9 @@ export function KpiAnalysisPanel({
               </button>
               
               {isSummaryDropdownOpen && (
-                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 w-max min-w-[220px] bg-white 
-                             rounded-xl border border-slate-200 shadow-2xl z-[9999]">
+                <div className="absolute left-0 right-0 sm:left-1/2 sm:-translate-x-1/2 sm:right-auto top-full mt-1 
+                              min-w-full sm:min-w-[220px] sm:w-max bg-white 
+                              rounded-xl border border-slate-200 shadow-2xl z-[9999]">
                   {config.summaries.map((summary, index) => (
                     <button
                       key={summary.id}
