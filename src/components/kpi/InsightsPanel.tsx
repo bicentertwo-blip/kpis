@@ -144,6 +144,14 @@ export function InsightsPanel({
         // Agrupar por dimensión - año actual
         // Para métricas de porcentaje: calcular promedio ponderado o simple
         // Para métricas numéricas: sumar valores
+        // Detectar si los valores de detalle están en escala decimal (0-1) vs porcentaje (0-100)
+        const needsScaling = isPercentageMetric && currentData && currentData.length > 0 && 
+          currentData.every((row: Record<string, unknown>) => {
+            const val = Number(row[metricKey]) || 0;
+            return val >= 0 && val <= 1.5; // Si todos los valores están entre 0 y 1.5, están en escala decimal
+          });
+        const scaleFactor = needsScaling ? 100 : 1;
+        
         const currentGrouped: Record<string, { value: number; meta: number; weight: number; count: number }> = {};
         (currentData || []).forEach((row: Record<string, unknown>) => {
           const key = String(row[dimensionKey] || 'Sin clasificar');
@@ -151,7 +159,7 @@ export function InsightsPanel({
             currentGrouped[key] = { value: 0, meta: 0, weight: 0, count: 0 };
           }
           
-          const metricValue = Number(row[metricKey]) || 0;
+          const metricValue = (Number(row[metricKey]) || 0) * scaleFactor;
           const weightValue = weightKey ? (Number(row[weightKey]) || 0) : 1;
           
           if (isPercentageMetric) {
@@ -166,6 +174,14 @@ export function InsightsPanel({
           currentGrouped[key].count += 1;
         });
 
+        // Detectar escala para datos del año anterior
+        const needsScalingPrev = isPercentageMetric && prevData && prevData.length > 0 && 
+          prevData.every((row: Record<string, unknown>) => {
+            const val = Number(row[metricKey]) || 0;
+            return val >= 0 && val <= 1.5;
+          });
+        const scaleFactorPrev = needsScalingPrev ? 100 : 1;
+
         // Agrupar por dimensión - año anterior
         const prevGrouped: Record<string, { value: number; weight: number; count: number }> = {};
         (prevData || []).forEach((row: Record<string, unknown>) => {
@@ -174,7 +190,7 @@ export function InsightsPanel({
             prevGrouped[key] = { value: 0, weight: 0, count: 0 };
           }
           
-          const metricValue = Number(row[metricKey]) || 0;
+          const metricValue = (Number(row[metricKey]) || 0) * scaleFactorPrev;
           const weightValue = weightKey ? (Number(row[weightKey]) || 0) : 1;
           
           if (isPercentageMetric) {

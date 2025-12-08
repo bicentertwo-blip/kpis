@@ -224,7 +224,15 @@ export function KpiDetailAnalysisPanel({
   const detailTotals = useMemo(() => {
     if (detailData.length === 0) return { value: null, meta: null, count: 0 };
     
-    const values = detailData.map(d => Number(d[detailMetricKey]) || 0);
+    // Detectar si los valores de detalle están en escala decimal (0-1) vs porcentaje (0-100)
+    const needsScaling = isPercentage && detailData.length > 0 && 
+      detailData.every(d => {
+        const val = Number(d[detailMetricKey]) || 0;
+        return val >= 0 && val <= 1.5; // Si todos los valores están entre 0 y 1.5, están en escala decimal
+      });
+    const scaleFactor = needsScaling ? 100 : 1;
+    
+    const values = detailData.map(d => (Number(d[detailMetricKey]) || 0) * scaleFactor);
     const metas = detailData.map(d => Number(d.meta) || 0).filter(m => m > 0);
     
     // Para porcentajes: promedio ponderado o simple

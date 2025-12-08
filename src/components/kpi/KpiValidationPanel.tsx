@@ -152,6 +152,14 @@ export function KpiValidationPanel({
     let totalValue: number;
     let totalMeta: number;
     
+    // Detectar si los valores de detalle están en escala decimal (0-1) vs porcentaje (0-100)
+    const needsScaling = isPercentage && detailData.length > 0 && 
+      detailData.every(d => {
+        const val = Number(d[detailMetricKey]) || 0;
+        return val >= 0 && val <= 1.5; // Si todos los valores están entre 0 y 1.5, están en escala decimal
+      });
+    const scaleFactor = needsScaling ? 100 : 1;
+    
     if (isPercentage) {
       // Para porcentajes: calcular promedio ponderado por mes
       // Primero agrupar por mes y calcular promedio ponderado de cada mes
@@ -159,7 +167,7 @@ export function KpiValidationPanel({
       
       detailData.forEach(d => {
         const mes = Number(d.mes);
-        const value = Number(d[detailMetricKey]) || 0;
+        const value = (Number(d[detailMetricKey]) || 0) * scaleFactor;
         const weight = weightKey ? (Number(d[weightKey]) || 1) : 1;
         const meta = Number(d.meta) || 0;
         
