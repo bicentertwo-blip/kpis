@@ -170,6 +170,8 @@ export function InsightsPanel({
           
           const metricValue = (Number(row[metricKey]) || 0) * scaleFactor;
           const weightValue = weightKey ? (Number(row[weightKey]) || 0) : 1;
+          // La meta también puede estar en escala decimal
+          const metaValue = (Number(row.meta) || 0) * scaleFactor;
           
           if (isPercentageMetric) {
             // Para porcentajes: acumular para calcular promedio ponderado
@@ -179,7 +181,7 @@ export function InsightsPanel({
             // Para valores absolutos: sumar directamente
             currentGrouped[key].value += metricValue;
           }
-          currentGrouped[key].meta += Number(row.meta) || 0;
+          currentGrouped[key].meta += metaValue;
           currentGrouped[key].count += 1;
         });
 

@@ -177,7 +177,8 @@ export function KpiValidationPanel({
         const mes = Number(d.mes);
         const value = (Number(d[detailMetricKey]) || 0) * scaleFactor;
         const weight = weightKey ? (Number(d[weightKey]) || 1) : 1;
-        const meta = Number(d.meta) || 0;
+        // La meta también puede estar en escala decimal
+        const meta = (Number(d.meta) || 0) * scaleFactor;
         
         if (!monthlyAverages[mes]) {
           monthlyAverages[mes] = { weightedSum: 0, totalWeight: 0, metaSum: 0, metaCount: 0 };

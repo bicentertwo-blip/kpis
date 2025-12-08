@@ -319,6 +319,8 @@ export function ExpandableDataTable({
       
       const rawValue = (Number(row[metricKey]) || 0) * scaleFactor;
       const weightValue = weightKey ? (Number(row[weightKey]) || 1) : 1;
+      // La meta también puede estar en escala decimal
+      const metaValue = (Number(row.meta) || 0) * scaleFactor;
       
       if (isPercentageMetric) {
         // Para porcentajes: acumular para promedio ponderado
@@ -330,7 +332,7 @@ export function ExpandableDataTable({
       }
       
       if (row.meta !== null && row.meta !== undefined) {
-        grouped[dimValue].meta = (grouped[dimValue].meta || 0) + Number(row.meta);
+        grouped[dimValue].meta = (grouped[dimValue].meta || 0) + metaValue;
       }
       grouped[dimValue].count += 1;
     });

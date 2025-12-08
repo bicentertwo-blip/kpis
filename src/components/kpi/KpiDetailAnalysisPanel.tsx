@@ -241,7 +241,8 @@ export function KpiDetailAnalysisPanel({
     }
     
     const values = detailData.map(d => (Number(d[detailMetricKey]) || 0) * scaleFactor);
-    const metas = detailData.map(d => Number(d.meta) || 0).filter(m => m > 0);
+    // La meta también puede estar en escala decimal
+    const metas = detailData.map(d => (Number(d.meta) || 0) * scaleFactor).filter(m => m > 0);
     
     // Para porcentajes: promedio ponderado o simple
     // Para moneda/número: suma

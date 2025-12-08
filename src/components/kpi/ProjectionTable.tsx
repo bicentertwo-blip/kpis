@@ -258,7 +258,8 @@ export function ProjectionTable({
       
       const rawValue = (Number(row[metricKey]) || 0) * scaleFactor;
       const weight = weightKey ? (Number(row[weightKey]) || 1) : 1;
-      const meta = Number(row.meta) || 0;
+      // La meta también puede estar en escala decimal, aplicar el mismo factor
+      const meta = (Number(row.meta) || 0) * scaleFactor;
       
       if (isPercentageMetric) {
         grouped[dimValue].monthlyValues[mes].weightedSum += rawValue * weight;
