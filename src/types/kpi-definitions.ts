@@ -22,7 +22,7 @@ export type KpiId =
   | 'gestion-riesgos'
   | 'gobierno-corporativo'
 
-export type FieldType = 'number' | 'currency' | 'percentage' | 'text' | 'long-text' | 'select'
+export type FieldType = 'number' | 'currency' | 'percentage' | 'index' | 'text' | 'long-text' | 'select'
 
 export interface FieldOption {
   value: string

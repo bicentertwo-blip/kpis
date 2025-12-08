@@ -88,21 +88,26 @@ export function KpiAnalysisPanel({
     return metricField?.label || 'Valor';
   }, [selectedSummary, metricKey]);
 
-  // Determinar si es porcentaje o moneda (para saber si promediar o sumar)
-  const isPercentage = useMemo(() => {
-    if (!selectedSummary?.fields) return false;
+  // Determinar el tipo de campo para formato y agregación
+  const fieldType = useMemo(() => {
+    if (!selectedSummary?.fields) return 'currency';
     const metricField = selectedSummary.fields.find(f => f.id === metricKey);
-    return metricField?.type === 'percentage';
+    return metricField?.type || 'currency';
   }, [selectedSummary, metricKey]);
 
-  // Determinar tipo de agregación: si tiene aggregationType explícito, usarlo; sino, avg para porcentaje, sum para el resto
+  // Determinar si es porcentaje o índice (para saber si promediar o sumar)
+  const isPercentage = fieldType === 'percentage';
+  const isIndex = fieldType === 'index';
+  const shouldAverage = isPercentage || isIndex;
+
+  // Determinar tipo de agregación: si tiene aggregationType explícito, usarlo; sino, avg para porcentaje/index, sum para el resto
   const shouldSum = useMemo(() => {
     if (selectedSummary?.aggregationType) {
       return selectedSummary.aggregationType === 'sum';
     }
-    // Default: sumar para moneda/número, promediar para porcentaje
-    return !isPercentage;
-  }, [selectedSummary, isPercentage]);
+    // Default: sumar para moneda/número, promediar para porcentaje/index
+    return !shouldAverage;
+  }, [selectedSummary, shouldAverage]);
 
   // Determinar si mayor es mejor (para semáforos y progreso)
   const higherIsBetter = useMemo(() => {
@@ -112,8 +117,9 @@ export function KpiAnalysisPanel({
   const formatValue = useCallback((v: number): string => {
     if (v === null || v === undefined) return '-';
     if (isPercentage) return `${v.toFixed(2)}%`;
+    if (isIndex) return v.toFixed(1); // Formato de índice: número con 1 decimal
     return v.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 0 });
-  }, [isPercentage]);
+  }, [isPercentage, isIndex]);
 
   // Cargar datos del resumen seleccionado
   useEffect(() => {

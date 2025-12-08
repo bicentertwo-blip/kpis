@@ -48,6 +48,7 @@ const fieldTypeConfig: Record<FieldDefinition['type'], { icon: React.ReactNode; 
   currency: { icon: <DollarSign className="size-3.5" />, prefix: '$' },
   percentage: { icon: <Percent className="size-3.5" /> },
   number: { icon: <Hash className="size-3.5" /> },
+  index: { icon: <Hash className="size-3.5" /> }, // Índices como NPS (-100 a 100)
   text: { icon: <Type className="size-3.5" /> },
   'long-text': { icon: <AlignLeft className="size-3.5" /> },
   select: { icon: <ChevronDown className="size-3.5" /> },
@@ -55,6 +56,28 @@ const fieldTypeConfig: Record<FieldDefinition['type'], { icon: React.ReactNode; 
 
 export const KpiSummaryForm = ({ section, filters }: KpiSummaryFormProps) => {
   const [showMetaAnualConfirmation, setShowMetaAnualConfirmation] = useState(false)
+  
+  // Obtener el tipo del campo meta_anual para formatear correctamente
+  const metaAnualField = section.fields.find(f => f.id === 'meta_anual' || f.id.startsWith('meta_anual'))
+  const metaAnualType = metaAnualField?.type || 'currency'
+  
+  // Función para formatear el valor de meta_anual según su tipo
+  const formatMetaAnualValue = (value: unknown): string => {
+    if (value === undefined || value === null || value === '') return '-'
+    const numValue = Number(value)
+    if (isNaN(numValue)) return String(value)
+    
+    switch (metaAnualType) {
+      case 'percentage':
+        return `${numValue.toFixed(2)}%`
+      case 'index':
+        return numValue.toFixed(1)
+      case 'currency':
+        return `$${numValue.toLocaleString()}`
+      default:
+        return numValue.toLocaleString()
+    }
+  }
   
   const {
     formValues,
@@ -467,10 +490,7 @@ export const KpiSummaryForm = ({ section, filters }: KpiSummaryFormProps) => {
               <div className="flex items-center justify-between">
                 <span className="text-sm text-amber-700">Meta Anual ({String(formValues['anio'] || new Date().getFullYear())})</span>
                 <span className="text-sm font-semibold text-amber-900">
-                  {typeof formValues['meta_anual'] === 'number' || typeof formValues['meta_anual'] === 'string'
-                    ? `$${Number(formValues['meta_anual']).toLocaleString()}`
-                    : String(formValues['meta_anual'] || '')
-                  }
+                  {formatMetaAnualValue(formValues['meta_anual'])}
                 </span>
               </div>
             </div>
@@ -567,8 +587,10 @@ const FormattedInput = ({ field, value, onChange, disabled }: FormattedInputProp
     }
     // Cuando no está enfocado, mostrar formateado
     if (value === undefined || value === null || value === '') return ''
+    // Para índices (como NPS), no aplicar formato de miles
+    if (field.type === 'index') return String(value)
     return formatWithThousands(value as string | number)
-  }, [value, isFocused])
+  }, [value, isFocused, field.type])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const input = e.target.value
@@ -583,6 +605,13 @@ const FormattedInput = ({ field, value, onChange, disabled }: FormattedInputProp
     onChange(sanitized)
   }
 
+  // Determinar padding según tipo de campo
+  const getPadding = () => {
+    if (field.type === 'currency') return 'pl-8 pr-4'
+    if (field.type === 'percentage') return 'pl-4 pr-8'
+    return 'px-4' // index, number, etc.
+  }
+
   return (
     <input
       type="text"
@@ -591,7 +620,7 @@ const FormattedInput = ({ field, value, onChange, disabled }: FormattedInputProp
         'w-full rounded-xl lg:rounded-2xl',
         'border border-white/60 bg-white/60',
         'py-3 text-sm text-vision-ink',
-        field.type === 'currency' ? 'pl-8 pr-4' : field.type === 'percentage' ? 'pl-4 pr-8' : 'px-4',
+        getPadding(),
         'placeholder:text-soft-slate/50',
         'focus:border-plasma-blue/40 focus:bg-white/80 focus:shadow-glow-sm',
         'focus:outline-none transition-all duration-200',
