@@ -105,6 +105,18 @@ export function KpiValidationPanel({
     return metricField?.type === 'percentage';
   }, [selectedSummary]);
 
+  // Determinar el tipo de campo para formato
+  const fieldType = useMemo(() => {
+    if (!selectedSummary?.fields) return 'currency';
+    const metricField = selectedSummary.fields.find(
+      f => !['anio', 'mes', 'meta'].includes(f.id) && !f.id.startsWith('meta')
+    );
+    return metricField?.type || 'currency';
+  }, [selectedSummary]);
+
+  const isNumber = fieldType === 'number';
+  const isIndex = fieldType === 'index';
+
   // Cargar datos del detalle - TODO el año hasta el mes actual
   useEffect(() => {
     const loadDetailData = async () => {
@@ -139,8 +151,10 @@ export function KpiValidationPanel({
   const formatValue = useCallback((v: number | null | undefined): string => {
     if (v === null || v === undefined) return '-';
     if (isPercentage) return `${v.toFixed(2)}%`;
+    if (isIndex) return v.toFixed(1);
+    if (isNumber) return Math.round(v).toLocaleString('es-MX'); // Sin decimales para números
     return v.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 0 });
-  }, [isPercentage]);
+  }, [isPercentage, isIndex, isNumber]);
 
   // Calcular totales del detalle acumulado
   const detailTotals = useMemo(() => {

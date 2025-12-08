@@ -119,7 +119,7 @@ export function KpiAnalysisPanel({
     if (v === null || v === undefined) return '-';
     if (isPercentage) return `${v.toFixed(2)}%`;
     if (isIndex) return v.toFixed(1); // Formato de índice: número con 1 decimal
-    if (isNumber) return v.toLocaleString('es-MX'); // Número con separadores de miles, sin símbolo
+    if (isNumber) return Math.round(v).toLocaleString('es-MX'); // Número entero con separadores de miles
     // Default: moneda
     return v.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 0 });
   }, [isPercentage, isIndex, isNumber]);
