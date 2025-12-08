@@ -525,13 +525,59 @@ export function KpiAnalysisPanel({
   if (summaryData.length === 0) {
     return (
       <div className="bg-white/70 backdrop-blur-xl rounded-2xl border border-white/80 shadow-glass p-8">
+        {/* Si hay múltiples resúmenes, mostrar selector para poder cambiar */}
+        {config.summaries.length > 1 && (
+          <div className="flex justify-center mb-6">
+            <div ref={summaryDropdownRef} className="relative z-50">
+              <button
+                onClick={() => setIsSummaryDropdownOpen(!isSummaryDropdownOpen)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 
+                         rounded-xl border border-slate-200 transition-all duration-200 shadow-soft"
+              >
+                <Layers size={16} className="text-plasma-indigo" />
+                <span className="text-vision-ink font-medium text-sm">
+                  {selectedSummary?.title || 'Seleccionar resumen'}
+                </span>
+                <ChevronDown 
+                  size={14} 
+                  className={`text-soft-slate transition-transform duration-200 ${isSummaryDropdownOpen ? 'rotate-180' : ''}`} 
+                />
+              </button>
+              
+              {isSummaryDropdownOpen && (
+                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 w-max min-w-[220px] bg-white 
+                             rounded-xl border border-slate-200 shadow-2xl z-[9999]">
+                  {config.summaries.map((summary, index) => (
+                    <button
+                      key={summary.id}
+                      onClick={() => {
+                        setSelectedSummaryIndex(index);
+                        setIsSummaryDropdownOpen(false);
+                      }}
+                      className={`w-full px-4 py-3 text-left transition-all duration-150 first:rounded-t-xl last:rounded-b-xl
+                                ${selectedSummaryIndex === index 
+                                  ? 'bg-plasma-blue/10 text-plasma-blue' 
+                                  : 'text-vision-ink hover:bg-slate-50'}`}
+                    >
+                      <span className="text-sm font-medium">{summary.title}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        
         <div className="text-center">
           <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-50 flex items-center justify-center">
             <BarChart2 size={32} className="text-slate-400" />
           </div>
           <h4 className="text-vision-ink font-semibold text-lg mb-2">Sin datos disponibles</h4>
           <p className="text-soft-slate text-sm">
-            Captura datos en la pestaña de Resumen para ver el análisis.
+            {config.summaries.length > 1 
+              ? `Captura datos en "${selectedSummary?.title || 'este resumen'}" o selecciona otro resumen arriba.`
+              : 'Captura datos en la pestaña de Resumen para ver el análisis.'
+            }
           </p>
         </div>
       </div>
