@@ -281,16 +281,34 @@ export function InsightsPanel({
     loadData();
   }, [selectedDetail, dimensionKey, metricKey, weightKey, isPercentageMetric, selectedYear, currentMonth]);
 
+  // Detectar si el resumen seleccionado es de tipo porcentaje
+  const isSummaryPercentage = useMemo(() => {
+    const summary = config.summaries[selectedSummaryIndex];
+    if (!summary?.fields) return false;
+    
+    const percentagePatterns = ['indice', 'ratio', 'porcentaje', 'tasa', 'roe', 'roa', 'margen', 'nps', 'clima', 'satisfaccion', 'quejas'];
+    const metricField = summary.fields.find(
+      f => !['anio', 'mes', 'meta'].includes(f.id) && !f.id.startsWith('meta')
+    );
+    
+    // Es porcentaje si el tipo es 'percentage' o si el nombre del campo sugiere que es un porcentaje/índice
+    return metricField?.type === 'percentage' || 
+           (metricField?.id && percentagePatterns.some(p => metricField.id.toLowerCase().includes(p)));
+  }, [config.summaries, selectedSummaryIndex]);
+
   // Calcular proyección
   const projection = useMemo(() => {
     if (currentMonth === 0 || accumulatedValue === 0) return null;
+    
+    // Para porcentajes: la proyección es igual al promedio (no multiplicar por 12)
+    // Para valores absolutos: proyectar linealmente
     const monthlyAvg = accumulatedValue / currentMonth;
-    const projectedAnnual = monthlyAvg * 12;
+    const projectedAnnual = isSummaryPercentage ? accumulatedValue : monthlyAvg * 12;
     const gap = metaAnual ? projectedAnnual - metaAnual : null;
     const compliance = metaAnual ? (projectedAnnual / metaAnual) * 100 : null;
     
     return { projectedAnnual, gap, compliance, monthlyAvg };
-  }, [accumulatedValue, currentMonth, metaAnual]);
+  }, [accumulatedValue, currentMonth, metaAnual, isSummaryPercentage]);
 
   // Top performers y atención requerida
   const { topPerformers, needsAttention } = useMemo(() => {
