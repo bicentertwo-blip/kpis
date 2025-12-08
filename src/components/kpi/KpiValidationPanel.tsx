@@ -432,29 +432,29 @@ export function KpiValidationPanel({
                 </div>
 
                 {/* Tabla comparativa */}
-                <div className="grid grid-cols-3 gap-2 text-xs md:text-sm">
-                  <div className="text-center p-2 bg-white/60 rounded-lg">
-                    <p className="text-soft-slate text-[10px] md:text-xs mb-1">Resumen</p>
-                    <p className="font-semibold text-vision-ink tabular-nums">
+                <div className="grid grid-cols-3 gap-1 sm:gap-2 text-[10px] sm:text-xs md:text-sm">
+                  <div className="text-center p-1.5 sm:p-2 bg-white/60 rounded-lg overflow-hidden">
+                    <p className="text-soft-slate text-[9px] sm:text-[10px] md:text-xs mb-0.5 sm:mb-1">Resumen</p>
+                    <p className="font-semibold text-vision-ink tabular-nums text-[10px] sm:text-xs md:text-sm truncate">
                       {formatValue(summaryAccumulated)}
                     </p>
                   </div>
-                  <div className="text-center p-2 bg-white/60 rounded-lg">
-                    <p className="text-soft-slate text-[10px] md:text-xs mb-1">Detalle</p>
-                    <p className="font-semibold text-vision-ink tabular-nums">
+                  <div className="text-center p-1.5 sm:p-2 bg-white/60 rounded-lg overflow-hidden">
+                    <p className="text-soft-slate text-[9px] sm:text-[10px] md:text-xs mb-0.5 sm:mb-1">Detalle</p>
+                    <p className="font-semibold text-vision-ink tabular-nums text-[10px] sm:text-xs md:text-sm truncate">
                       {formatValue(detailTotals.value)}
                     </p>
                   </div>
-                  <div className="text-center p-2 bg-white/60 rounded-lg">
-                    <p className="text-soft-slate text-[10px] md:text-xs mb-1">Diferencia</p>
+                  <div className="text-center p-1.5 sm:p-2 bg-white/60 rounded-lg overflow-hidden">
+                    <p className="text-soft-slate text-[9px] sm:text-[10px] md:text-xs mb-0.5 sm:mb-1">Diferencia</p>
                     <p className={cn(
-                      "font-semibold tabular-nums",
+                      "font-semibold tabular-nums text-[10px] sm:text-xs md:text-sm truncate",
                       valueValidation.difference >= 0 ? "text-emerald-600" : "text-rose-600"
                     )}>
                       {valueValidation.difference >= 0 ? '+' : ''}{formatValue(valueValidation.difference)}
                     </p>
-                    <p className="text-[10px] text-soft-slate">
-                      ({(valueValidation.percentDiff * 100).toFixed(2)}%)
+                    <p className="text-[8px] sm:text-[10px] text-soft-slate">
+                      ({(valueValidation.percentDiff * 100).toFixed(1)}%)
                     </p>
                   </div>
                 </div>
@@ -481,23 +481,23 @@ export function KpiValidationPanel({
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 text-xs md:text-sm">
-                    <div className="text-center p-2 bg-white/60 rounded-lg">
-                      <p className="text-soft-slate text-[10px] md:text-xs mb-1">Resumen</p>
-                      <p className="font-semibold text-vision-ink tabular-nums">
+                  <div className="grid grid-cols-3 gap-1 sm:gap-2 text-[10px] sm:text-xs md:text-sm">
+                    <div className="text-center p-1.5 sm:p-2 bg-white/60 rounded-lg overflow-hidden">
+                      <p className="text-soft-slate text-[9px] sm:text-[10px] md:text-xs mb-0.5 sm:mb-1">Resumen</p>
+                      <p className="font-semibold text-vision-ink tabular-nums text-[10px] sm:text-xs md:text-sm truncate">
                         {formatValue(summaryMetaAnual)}
                       </p>
                     </div>
-                    <div className="text-center p-2 bg-white/60 rounded-lg">
-                      <p className="text-soft-slate text-[10px] md:text-xs mb-1">Detalle</p>
-                      <p className="font-semibold text-vision-ink tabular-nums">
+                    <div className="text-center p-1.5 sm:p-2 bg-white/60 rounded-lg overflow-hidden">
+                      <p className="text-soft-slate text-[9px] sm:text-[10px] md:text-xs mb-0.5 sm:mb-1">Detalle</p>
+                      <p className="font-semibold text-vision-ink tabular-nums text-[10px] sm:text-xs md:text-sm truncate">
                         {formatValue(detailTotals.meta)}
                       </p>
                     </div>
-                    <div className="text-center p-2 bg-white/60 rounded-lg">
-                      <p className="text-soft-slate text-[10px] md:text-xs mb-1">Diferencia</p>
+                    <div className="text-center p-1.5 sm:p-2 bg-white/60 rounded-lg overflow-hidden">
+                      <p className="text-soft-slate text-[9px] sm:text-[10px] md:text-xs mb-0.5 sm:mb-1">Diferencia</p>
                       <p className={cn(
-                        "font-semibold tabular-nums",
+                        "font-semibold tabular-nums text-[10px] sm:text-xs md:text-sm truncate",
                         metaValidation.difference >= 0 ? "text-emerald-600" : "text-rose-600"
                       )}>
                         {metaValidation.difference >= 0 ? '+' : ''}{formatValue(metaValidation.difference)}
