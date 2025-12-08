@@ -28,19 +28,12 @@ const KPI_CONFIG: Record<string, {
   summaryTables: string[]
   detailTables: string[]
 }> = {
-  'margen-financiero': {
-    name: 'Margen Financiero',
-    shortName: 'Margen Fin.',
-    icon: 'LineChart',
-    summaryTables: ['kpi_margen_financiero_resumen'],
-    detailTables: ['kpi_margen_financiero_detalle'],
-  },
-  'rentabilidad-operativa': {
-    name: 'ROE y ROA',
-    shortName: 'ROE/ROA',
-    icon: 'GaugeCircle',
-    summaryTables: ['kpi_roe_roa_resumen'],
-    detailTables: ['kpi_roe_roa_detalle'],
+  'colocacion': {
+    name: 'Colocación',
+    shortName: 'Colocación',
+    icon: 'Send',
+    summaryTables: ['kpi_colocacion_resumen_1', 'kpi_colocacion_resumen_2', 'kpi_colocacion_resumen_3'],
+    detailTables: ['kpi_colocacion_detalle_1', 'kpi_colocacion_detalle_2', 'kpi_colocacion_detalle_3'],
   },
   'indice-renovacion-creditos': {
     name: 'Índice de Renovación',
@@ -49,33 +42,12 @@ const KPI_CONFIG: Record<string, {
     summaryTables: ['kpi_indice_renovacion_resumen'],
     detailTables: ['kpi_indice_renovacion_detalle'],
   },
-  'colocacion': {
-    name: 'Colocación',
-    shortName: 'Colocación',
-    icon: 'Send',
-    summaryTables: ['kpi_colocacion_resumen_1', 'kpi_colocacion_resumen_2', 'kpi_colocacion_resumen_3'],
-    detailTables: ['kpi_colocacion_detalle_1', 'kpi_colocacion_detalle_2', 'kpi_colocacion_detalle_3'],
-  },
-  'rentabilidad': {
-    name: 'Rentabilidad',
-    shortName: 'Rentabilidad',
-    icon: 'PiggyBank',
-    summaryTables: ['kpi_rentabilidad_resumen_1', 'kpi_rentabilidad_resumen_2', 'kpi_rentabilidad_resumen_3', 'kpi_rentabilidad_resumen_4'],
-    detailTables: ['kpi_rentabilidad_detalle_1', 'kpi_rentabilidad_detalle_2', 'kpi_rentabilidad_detalle_3', 'kpi_rentabilidad_detalle_4'],
-  },
-  'rotacion-personal': {
-    name: 'Rotación de Personal',
-    shortName: 'Rotación',
-    icon: 'Users2',
-    summaryTables: ['kpi_rotacion_resumen_1', 'kpi_rotacion_resumen_2', 'kpi_rotacion_resumen_3', 'kpi_rotacion_resumen_4'],
-    detailTables: ['kpi_rotacion_detalle_1', 'kpi_rotacion_detalle_2', 'kpi_rotacion_detalle_3', 'kpi_rotacion_detalle_4'],
-  },
-  'escalabilidad': {
-    name: 'Escalabilidad',
-    shortName: 'Escalabilidad',
-    icon: 'Layers',
-    summaryTables: ['kpi_escalabilidad_resumen_1', 'kpi_escalabilidad_resumen_2', 'kpi_escalabilidad_resumen_3'],
-    detailTables: ['kpi_escalabilidad_detalle_1', 'kpi_escalabilidad_detalle_2', 'kpi_escalabilidad_detalle_3'],
+  'margen-financiero': {
+    name: 'Margen Financiero',
+    shortName: 'Margen Fin.',
+    icon: 'LineChart',
+    summaryTables: ['kpi_margen_financiero_resumen'],
+    detailTables: ['kpi_margen_financiero_detalle'],
   },
   'posicionamiento-marca': {
     name: 'Posicionamiento de Marca',
@@ -84,12 +56,12 @@ const KPI_CONFIG: Record<string, {
     summaryTables: ['kpi_posicionamiento_resumen_1', 'kpi_posicionamiento_resumen_2', 'kpi_posicionamiento_resumen_3'],
     detailTables: ['kpi_posicionamiento_detalle_1', 'kpi_posicionamiento_detalle_2', 'kpi_posicionamiento_detalle_3'],
   },
-  'innovacion-incremental': {
-    name: 'Innovación Incremental',
-    shortName: 'Innovación',
-    icon: 'FlaskRound',
-    summaryTables: ['kpi_innovacion_resumen'],
-    detailTables: ['kpi_innovacion_detalle'],
+  'rotacion-personal': {
+    name: 'Rotación de Personal',
+    shortName: 'Rotación',
+    icon: 'Users2',
+    summaryTables: ['kpi_rotacion_resumen_1', 'kpi_rotacion_resumen_2', 'kpi_rotacion_resumen_3', 'kpi_rotacion_resumen_4'],
+    detailTables: ['kpi_rotacion_detalle_1', 'kpi_rotacion_detalle_2', 'kpi_rotacion_detalle_3', 'kpi_rotacion_detalle_4'],
   },
   'satisfaccion-cliente': {
     name: 'Satisfacción Cliente',
@@ -98,12 +70,33 @@ const KPI_CONFIG: Record<string, {
     summaryTables: ['kpi_satisfaccion_resumen_1', 'kpi_satisfaccion_resumen_2', 'kpi_satisfaccion_resumen_3'],
     detailTables: ['kpi_satisfaccion_detalle_1', 'kpi_satisfaccion_detalle_2', 'kpi_satisfaccion_detalle_3'],
   },
-  'cumplimiento-regulatorio': {
-    name: 'Cumplimiento Regulatorio',
-    shortName: 'Cumplimiento',
-    icon: 'ShieldCheck',
-    summaryTables: ['kpi_cumplimiento_resumen_1', 'kpi_cumplimiento_resumen_2'],
-    detailTables: [],
+  'escalabilidad': {
+    name: 'Escalabilidad',
+    shortName: 'Escalabilidad',
+    icon: 'Layers',
+    summaryTables: ['kpi_escalabilidad_resumen_1', 'kpi_escalabilidad_resumen_2', 'kpi_escalabilidad_resumen_3'],
+    detailTables: ['kpi_escalabilidad_detalle_1', 'kpi_escalabilidad_detalle_2', 'kpi_escalabilidad_detalle_3'],
+  },
+  'rentabilidad-operativa': {
+    name: 'ROE y ROA',
+    shortName: 'ROE/ROA',
+    icon: 'GaugeCircle',
+    summaryTables: ['kpi_roe_roa_resumen'],
+    detailTables: ['kpi_roe_roa_detalle'],
+  },
+  'rentabilidad': {
+    name: 'Rentabilidad',
+    shortName: 'Rentabilidad',
+    icon: 'PiggyBank',
+    summaryTables: ['kpi_rentabilidad_resumen_1', 'kpi_rentabilidad_resumen_2', 'kpi_rentabilidad_resumen_3', 'kpi_rentabilidad_resumen_4'],
+    detailTables: ['kpi_rentabilidad_detalle_1', 'kpi_rentabilidad_detalle_2', 'kpi_rentabilidad_detalle_3', 'kpi_rentabilidad_detalle_4'],
+  },
+  'innovacion-incremental': {
+    name: 'Innovación Incremental',
+    shortName: 'Innovación',
+    icon: 'FlaskRound',
+    summaryTables: ['kpi_innovacion_resumen'],
+    detailTables: ['kpi_innovacion_detalle'],
   },
   'gestion-riesgos': {
     name: 'Gestión de Riesgos',
@@ -111,6 +104,13 @@ const KPI_CONFIG: Record<string, {
     icon: 'Radar',
     summaryTables: ['kpi_gestion_riesgos_resumen'],
     detailTables: ['kpi_gestion_riesgos_detalle'],
+  },
+  'cumplimiento-regulatorio': {
+    name: 'Cumplimiento Regulatorio',
+    shortName: 'Cumplimiento',
+    icon: 'ShieldCheck',
+    summaryTables: ['kpi_cumplimiento_resumen_1', 'kpi_cumplimiento_resumen_2'],
+    detailTables: [],
   },
   'gobierno-corporativo': {
     name: 'Gobierno Corporativo',
@@ -121,7 +121,24 @@ const KPI_CONFIG: Record<string, {
   },
 }
 
-const KPI_LIST = Object.keys(KPI_CONFIG)
+// Orden específico de KPIs (igual que Dashboard y Sidebar)
+const KPI_ORDER = [
+  'colocacion',
+  'indice-renovacion-creditos',
+  'margen-financiero',
+  'posicionamiento-marca',
+  'rotacion-personal',
+  'satisfaccion-cliente',
+  'escalabilidad',
+  'rentabilidad-operativa',
+  'rentabilidad',
+  'innovacion-incremental',
+  'gestion-riesgos',
+  'cumplimiento-regulatorio',
+  'gobierno-corporativo',
+]
+
+const KPI_LIST = KPI_ORDER.filter(id => id in KPI_CONFIG)
 
 const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
