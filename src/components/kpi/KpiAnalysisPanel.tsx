@@ -1168,26 +1168,26 @@ export function KpiAnalysisPanel({
                             <p className="text-xs text-slate-600 leading-relaxed">
                               La proyección estima el resultado anual basándose en el <span className="font-semibold text-emerald-600">ritmo actual de acumulación</span>.
                             </p>
-                            <div className="p-2 bg-white/70 rounded-lg border border-slate-200/60 overflow-x-auto">
-                              <div className="flex flex-wrap items-center gap-1.5 text-xs min-w-max sm:min-w-0">
-                                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded font-medium whitespace-nowrap">
+                            <div className="p-2 bg-white/70 rounded-lg border border-slate-200/60 overflow-hidden">
+                              <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs justify-center sm:justify-start">
+                                <span className="px-1.5 sm:px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded font-medium break-all max-w-full text-center">
                                   {formatValue(latestMetrics.metaProgress.current)}
                                 </span>
                                 <span className="text-slate-400">÷</span>
-                                <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded font-medium">
+                                <span className="px-1.5 sm:px-2 py-0.5 bg-slate-100 text-slate-700 rounded font-medium">
                                   {latestMetrics.month}m
                                 </span>
                                 <span className="text-slate-400">×</span>
-                                <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded font-medium">
+                                <span className="px-1.5 sm:px-2 py-0.5 bg-slate-100 text-slate-700 rounded font-medium">
                                   12
                                 </span>
                                 <span className="text-slate-400">=</span>
-                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded font-semibold whitespace-nowrap">
+                                <span className="px-1.5 sm:px-2 py-0.5 bg-blue-100 text-blue-700 rounded font-semibold break-all max-w-full text-center">
                                   {formatValue(latestMetrics.metaProgress.projectedAnnual)}
                                 </span>
                               </div>
                             </div>
-                            <p className="text-[11px] text-slate-500 italic">
+                            <p className="text-[10px] sm:text-[11px] text-slate-500 italic break-all">
                               Promedio mensual: {formatValue(latestMetrics.metaProgress.current / latestMetrics.month)}
                             </p>
                           </div>
