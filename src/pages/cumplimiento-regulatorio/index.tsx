@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { motion } from 'framer-motion'
-import { Shield } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Shield, ChevronLeft, ChevronRight } from 'lucide-react'
 import { CUMPLIMIENTO_CONFIG } from '@/config/kpi-configs'
-import { KpiSummarySection } from '@/components/kpi/KpiSummarySection'
+import { KpiSummaryForm } from '@/components/kpi/KpiSummaryForm'
 import { RegulatoryComplianceAnalysisPanel } from '@/components/kpi/RegulatoryComplianceAnalysisPanel'
-import { KpiDetailImporter } from '@/components/kpi/KpiDetailImporter'
+import { Button } from '@/components/base/Button'
 
 const CumplimientoRegulatorioPage = () => {
   const currentYear = new Date().getFullYear()
@@ -15,7 +15,12 @@ const CumplimientoRegulatorioPage = () => {
     mes: currentMonth
   })
 
-  const [activeTab, setActiveTab] = useState<'analisis' | 'resumen' | 'importar'>('analisis')
+  const [activeTab, setActiveTab] = useState<'analisis' | 'resumen'>('analisis')
+  const [activeSummaryIndex, setActiveSummaryIndex] = useState(0)
+  
+  const summaries = CUMPLIMIENTO_CONFIG.summaries
+  const hasMultipleSummaries = summaries.length > 1
+  const currentSummary = summaries[activeSummaryIndex]
 
   return (
     <div className="min-h-screen pb-8">
@@ -67,32 +72,85 @@ const CumplimientoRegulatorioPage = () => {
           }`}
         >
           <span>Resumen</span>
-          <span className="px-1.5 py-0.5 bg-white/20 rounded text-xs">2</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('importar')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${
-            activeTab === 'importar'
-              ? 'bg-plasma-blue text-white shadow-lg shadow-plasma-blue/30'
-              : 'bg-white/60 text-soft-slate hover:bg-white hover:text-vision-ink'
-          }`}
-        >
-          <span>Importar</span>
+          <span className="px-1.5 py-0.5 bg-white/20 rounded text-xs">{summaries.length}</span>
         </button>
       </div>
 
       {/* Content */}
-      {activeTab === 'analisis' && (
-        <RegulatoryComplianceAnalysisPanel config={CUMPLIMIENTO_CONFIG} filters={filters} />
-      )}
+      <AnimatePresence mode="wait">
+        {activeTab === 'analisis' && (
+          <motion.div
+            key="analisis"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+          >
+            <RegulatoryComplianceAnalysisPanel config={CUMPLIMIENTO_CONFIG} filters={filters} />
+          </motion.div>
+        )}
 
-      {activeTab === 'resumen' && (
-        <KpiSummarySection config={CUMPLIMIENTO_CONFIG} />
-      )}
+        {activeTab === 'resumen' && (
+          <motion.div
+            key="resumen"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className="space-y-4"
+          >
+            {/* Navegación entre secciones de resumen */}
+            {hasMultipleSummaries && (
+              <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                {summaries.map((summary, index) => (
+                  <button
+                    key={summary.id}
+                    onClick={() => setActiveSummaryIndex(index)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-sm transition-all whitespace-nowrap border ${
+                      activeSummaryIndex === index
+                        ? 'bg-white text-vision-ink border-plasma-blue/30 shadow-md'
+                        : 'bg-white/40 text-soft-slate border-transparent hover:bg-white/60'
+                    }`}
+                  >
+                    <span>{summary.title}</span>
+                    {activeSummaryIndex === index && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-plasma-blue" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
 
-      {activeTab === 'importar' && (
-        <KpiDetailImporter config={CUMPLIMIENTO_CONFIG} />
-      )}
+            {/* Formulario del resumen actual */}
+            <KpiSummaryForm section={currentSummary} />
+
+            {/* Navegación con flechas */}
+            {hasMultipleSummaries && (
+              <div className="flex items-center justify-between pt-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={<ChevronLeft className="size-4" />}
+                  onClick={() => setActiveSummaryIndex(Math.max(0, activeSummaryIndex - 1))}
+                  disabled={activeSummaryIndex === 0}
+                >
+                  Anterior
+                </Button>
+                <span className="text-sm text-soft-slate">
+                  {activeSummaryIndex + 1} de {summaries.length}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconRight={<ChevronRight className="size-4" />}
+                  onClick={() => setActiveSummaryIndex(Math.min(summaries.length - 1, activeSummaryIndex + 1))}
+                  disabled={activeSummaryIndex === summaries.length - 1}
+                >
+                  Siguiente
+                </Button>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
