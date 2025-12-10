@@ -91,14 +91,14 @@ export const KPI_DASHBOARD_METRICS: KpiDashboardMetric[] = [
   {
     id: 'satisfaccion-cliente',
     name: 'Satisfacción Cliente',
-    shortName: 'NPS',
+    shortName: 'Clima',
     icon: 'Smile',
-    tableName: 'kpi_satisfaccion_resumen_1',
-    metricKey: 'nps',
+    tableName: 'kpi_satisfaccion_resumen_3',
+    metricKey: 'clima_laboral',
     metaKey: 'meta',
     aggregationType: 'avg',
     higherIsBetter: true,
-    format: 'number',
+    format: 'percentage',
     route: '/satisfaccion-cliente',
   },
   {
