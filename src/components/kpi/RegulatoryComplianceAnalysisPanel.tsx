@@ -65,6 +65,13 @@ export function RegulatoryComplianceAnalysisPanel({
   const yearDropdownRef = useRef<HTMLDivElement>(null);
   const metricDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Resetear vista a overview cuando se cambia a Reportes (no tiene otras vistas)
+  useEffect(() => {
+    if (selectedMetric === 'reportes' && activeView !== 'overview') {
+      setActiveView('overview');
+    }
+  }, [selectedMetric, activeView]);
+
   // Cerrar dropdowns al hacer click fuera
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -121,13 +128,19 @@ export function RegulatoryComplianceAnalysisPanel({
     loadData();
   }, []);
 
-  // Años disponibles
+  // Años disponibles por tipo de métrica
+  const reportesYears = useMemo(() => {
+    return Array.from(new Set(reportesData.map(r => r.anio))).sort((a, b) => b - a);
+  }, [reportesData]);
+
+  const observacionesYears = useMemo(() => {
+    return Array.from(new Set(observacionesData.map(r => r.anio))).sort((a, b) => b - a);
+  }, [observacionesData]);
+
+  // Años disponibles según métrica seleccionada
   const availableYears = useMemo(() => {
-    const years = new Set<number>();
-    observacionesData.forEach(r => years.add(r.anio));
-    reportesData.forEach(r => years.add(r.anio));
-    return Array.from(years).sort((a, b) => b - a);
-  }, [observacionesData, reportesData]);
+    return selectedMetric === 'reportes' ? reportesYears : observacionesYears;
+  }, [selectedMetric, reportesYears, observacionesYears]);
 
   // Colores para años en gráficas
   const yearColors: Record<number, string> = useMemo(() => {
@@ -139,11 +152,12 @@ export function RegulatoryComplianceAnalysisPanel({
       '#7c3aed', // Violet 600
     ];
     const colors: Record<number, string> = {};
-    [...availableYears].sort((a, b) => b - a).forEach((year: number, index: number) => {
+    const allYears = [...new Set([...reportesYears, ...observacionesYears])].sort((a, b) => b - a);
+    allYears.forEach((year: number, index: number) => {
       colors[year] = palette[index % palette.length];
     });
     return colors;
-  }, [availableYears]);
+  }, [reportesYears, observacionesYears]);
 
   // Datos del año seleccionado
   const currentYearObservaciones = useMemo(() => {
@@ -158,39 +172,35 @@ export function RegulatoryComplianceAnalysisPanel({
       .sort((a, b) => a.mes - b.mes);
   }, [reportesData, selectedYear]);
 
-  // Datos agrupados por año para gráficas
-  const dataByYear = useMemo(() => {
-    const grouped: Record<number, { reportes: ReportesRecord[]; observaciones: ObservacionRecord[] }> = {};
-    availableYears.forEach(year => {
-      grouped[year] = {
-        reportes: reportesData.filter(r => r.anio === year).sort((a, b) => a.mes - b.mes),
-        observaciones: observacionesData.filter(r => r.anio === year).sort((a, b) => a.mes - b.mes)
-      };
-    });
-    return grouped;
-  }, [reportesData, observacionesData, availableYears]);
-
-  // Datos para gráfica de tendencia mensual
-  const monthlyChartData = useMemo(() => {
-    const data = MONTH_NAMES.map((mes, index) => {
+  // Datos para gráfica de tendencia mensual - REPORTES
+  const reportesChartData = useMemo(() => {
+    return MONTH_NAMES.map((mes, index) => {
       const monthNum = index + 1;
       const point: Record<string, string | number | null> = { mes };
       
-      availableYears.forEach(year => {
-        const yearData = dataByYear[year];
-        if (selectedMetric === 'reportes') {
-          const record = yearData.reportes.find(r => r.mes === monthNum);
-          point[`año_${year}`] = record ? record.reportes_a_tiempo : null;
-        } else {
-          const record = yearData.observaciones.find(r => r.mes === monthNum);
-          point[`año_${year}`] = record ? record.observaciones_cnbv_condusef : null;
-        }
+      reportesYears.forEach(year => {
+        const record = reportesData.find(r => r.anio === year && r.mes === monthNum);
+        point[`año_${year}`] = record ? record.reportes_a_tiempo : null;
       });
       
       return point;
     });
-    return data;
-  }, [availableYears, dataByYear, selectedMetric]);
+  }, [reportesYears, reportesData]);
+
+  // Datos para gráfica de tendencia mensual - OBSERVACIONES
+  const observacionesChartData = useMemo(() => {
+    return MONTH_NAMES.map((mes, index) => {
+      const monthNum = index + 1;
+      const point: Record<string, string | number | null> = { mes };
+      
+      observacionesYears.forEach(year => {
+        const record = observacionesData.find(r => r.anio === year && r.mes === monthNum);
+        point[`año_${year}`] = record ? record.observaciones_cnbv_condusef : null;
+      });
+      
+      return point;
+    });
+  }, [observacionesYears, observacionesData]);
 
   // Métricas calculadas para Observaciones
   const observacionesMetrics = useMemo(() => {
@@ -381,26 +391,28 @@ export function RegulatoryComplianceAnalysisPanel({
           </div>
         </div>
 
-        {/* Tabs de vista */}
-        <div className="flex flex-wrap gap-1.5">
-          {[
-            { id: 'overview', label: 'Resumen', icon: Activity },
-            { id: 'timeline', label: 'Línea de Tiempo', icon: Clock },
-            { id: 'descriptions', label: 'Descripciones', icon: FileText }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveView(tab.id as typeof activeView)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200
-                        ${activeView === tab.id 
-                          ? 'bg-plasma-blue text-white shadow-md shadow-plasma-blue/25' 
-                          : 'text-soft-slate hover:text-vision-ink hover:bg-slate-100'}`}
-            >
-              <tab.icon size={14} />
-              <span className="hidden sm:inline">{tab.label}</span>
-            </button>
-          ))}
-        </div>
+        {/* Tabs de vista - Solo mostrar todas las vistas para Observaciones */}
+        {selectedMetric === 'observaciones' && (
+          <div className="flex flex-wrap gap-1.5">
+            {[
+              { id: 'overview', label: 'Resumen', icon: Activity },
+              { id: 'timeline', label: 'Línea de Tiempo', icon: Clock },
+              { id: 'descriptions', label: 'Descripciones', icon: FileText }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveView(tab.id as typeof activeView)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200
+                          ${activeView === tab.id 
+                            ? 'bg-plasma-blue text-white shadow-md shadow-plasma-blue/25' 
+                            : 'text-soft-slate hover:text-vision-ink hover:bg-slate-100'}`}
+              >
+                <tab.icon size={14} />
+                <span className="hidden sm:inline">{tab.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Contenido */}
@@ -474,10 +486,10 @@ export function RegulatoryComplianceAnalysisPanel({
                 <h4 className="text-vision-ink font-medium text-sm mb-4">Tendencia Mensual por Año</h4>
                 <div className="h-64 md:h-80">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={monthlyChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <AreaChart data={reportesChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                       <defs>
-                        {availableYears.map((year: number, idx: number) => (
-                          <linearGradient key={year} id={`gradient-${year}`} x1="0" y1="0" x2="0" y2="1">
+                        {reportesYears.map((year: number, idx: number) => (
+                          <linearGradient key={year} id={`gradient-rep-${year}`} x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor={yearColors[year]} stopOpacity={idx === 0 ? 0.25 : 0.08} />
                             <stop offset="95%" stopColor={yearColors[year]} stopOpacity={0} />
                           </linearGradient>
@@ -510,14 +522,14 @@ export function RegulatoryComplianceAnalysisPanel({
                           return <span style={{ color: yearColors[Number(year)], fontWeight: 600 }}>{year}</span>;
                         }}
                       />
-                      {[...availableYears].sort((a, b) => a - b).map((year: number) => (
+                      {[...reportesYears].sort((a, b) => a - b).map((year: number) => (
                         <Area
                           key={year}
                           type="monotone"
                           dataKey={`año_${year}`}
                           stroke={yearColors[year]}
                           strokeWidth={year === selectedYear ? 3 : 1.5}
-                          fill={`url(#gradient-${year})`}
+                          fill={`url(#gradient-rep-${year})`}
                           dot={{ fill: yearColors[year], strokeWidth: 0, r: year === selectedYear ? 4 : 2 }}
                           activeDot={{ r: 6, strokeWidth: 2, stroke: '#fff' }}
                           connectNulls
@@ -655,9 +667,9 @@ export function RegulatoryComplianceAnalysisPanel({
                 <h4 className="text-vision-ink font-medium text-sm mb-4">Tendencia Mensual por Año</h4>
                 <div className="h-64 md:h-80">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={monthlyChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <AreaChart data={observacionesChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                       <defs>
-                        {availableYears.map((year: number, idx: number) => (
+                        {observacionesYears.map((year: number, idx: number) => (
                           <linearGradient key={year} id={`gradient-obs-${year}`} x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor={yearColors[year]} stopOpacity={idx === 0 ? 0.25 : 0.08} />
                             <stop offset="95%" stopColor={yearColors[year]} stopOpacity={0} />
@@ -690,7 +702,7 @@ export function RegulatoryComplianceAnalysisPanel({
                           return <span style={{ color: yearColors[Number(year)], fontWeight: 600 }}>{year}</span>;
                         }}
                       />
-                      {[...availableYears].sort((a, b) => a - b).map((year: number) => (
+                      {[...observacionesYears].sort((a, b) => a - b).map((year: number) => (
                         <Area
                           key={year}
                           type="monotone"
