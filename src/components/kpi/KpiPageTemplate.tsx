@@ -18,6 +18,9 @@ import type { KpiDefinition, SectionDefinition, DetailLayoutDefinition } from '@
 import { KpiSummaryForm } from './KpiSummaryForm'
 import { KpiDetailImporter } from './KpiDetailImporter'
 import { KpiAnalysisPanel } from './KpiAnalysisPanel'
+import { InnovacionAnalysisPanel } from './InnovacionAnalysisPanel'
+import { RiskManagementAnalysisPanel } from './RiskManagementAnalysisPanel'
+import { GovernanceAnalysisPanel } from './GovernanceAnalysisPanel'
 import { KpiHeaderNew } from './KpiHeaderNew'
 import { GlassCard } from '@/components/base/GlassCard'
 import { Button } from '@/components/base/Button'
@@ -330,10 +333,28 @@ export const KpiPageTemplate = ({ config }: KpiPageTemplateProps) => {
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
           >
-            <KpiAnalysisPanel 
-              config={config}
-              filters={{ anio: selectedYear, mes: selectedMonth }}
-            />
+            {/* Paneles de análisis especializados según el KPI */}
+            {config.id === 'innovacion-incremental' ? (
+              <InnovacionAnalysisPanel 
+                config={config}
+                filters={{ anio: selectedYear, mes: selectedMonth }}
+              />
+            ) : config.id === 'gestion-riesgos' ? (
+              <RiskManagementAnalysisPanel 
+                config={config}
+                filters={{ anio: selectedYear, mes: selectedMonth }}
+              />
+            ) : config.id === 'gobierno-corporativo' ? (
+              <GovernanceAnalysisPanel 
+                config={config}
+                filters={{ anio: selectedYear, mes: selectedMonth }}
+              />
+            ) : (
+              <KpiAnalysisPanel 
+                config={config}
+                filters={{ anio: selectedYear, mes: selectedMonth }}
+              />
+            )}
           </motion.div>
         ) : activeTab === 'summary' ? (
           <motion.div
