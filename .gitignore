@@ -28,3 +28,6 @@ dist-ssr
 .env.*.local
 
 .vercel
+
+# Blueprint privado
+docs/VISION_GLASS_BLUEPRINT.md
