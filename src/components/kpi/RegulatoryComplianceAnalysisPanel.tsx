@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar, ReferenceLine } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { 
   Shield,
   ShieldAlert,
@@ -10,18 +10,18 @@ import {
   CheckCircle2,
   Clock,
   TrendingDown,
-  TrendingUp,
   Loader2,
   ChevronDown,
   Eye,
   AlertCircle,
   Activity,
-  BarChart2,
-  Target
+  BarChart2
 } from 'lucide-react';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { KpiDefinition } from '@/types/kpi-definitions';
+import { KpiAnalysisPanel } from './KpiAnalysisPanel';
+import { CUMPLIMIENTO_CONFIG } from '@/config/kpi-configs';
 
 interface RegulatoryComplianceAnalysisPanelProps {
   config: KpiDefinition;
@@ -40,45 +40,39 @@ type ObservacionRecord = {
   meta_anual?: number;
 };
 
-type ReportesRecord = {
-  anio: number;
-  mes: number;
-  reportes_a_tiempo: number;
-  meta: number;
-  meta_anual?: number;
-};
-
 type MetricType = 'reportes' | 'observaciones';
-type ReportesView = 'overview' | 'monthly' | 'accumulated' | 'annual';
 type ObservacionesView = 'overview' | 'timeline' | 'descriptions';
 
 export function RegulatoryComplianceAnalysisPanel({
-  filters: initialFilters
+  filters
 }: RegulatoryComplianceAnalysisPanelProps) {
-  // Vistas separadas por tipo de métrica
-  const [reportesView, setReportesView] = useState<ReportesView>('overview');
-  const [observacionesView, setObservacionesView] = useState<ObservacionesView>('overview');
-  
-  const [observacionesData, setObservacionesData] = useState<ObservacionRecord[]>([]);
-  const [reportesData, setReportesData] = useState<ReportesRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedYear, setSelectedYear] = useState<number>(initialFilters.anio);
   const [selectedMetric, setSelectedMetric] = useState<MetricType>('reportes');
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isMetricDropdownOpen, setIsMetricDropdownOpen] = useState(false);
-  const [expandedMonth, setExpandedMonth] = useState<number | null>(null);
-  
-  const yearDropdownRef = useRef<HTMLDivElement>(null);
   const metricDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Para Observaciones - panel especializado
+  const [observacionesView, setObservacionesView] = useState<ObservacionesView>('overview');
+  const [observacionesData, setObservacionesData] = useState<ObservacionRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedYear, setSelectedYear] = useState<number>(filters.anio);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [expandedMonth, setExpandedMonth] = useState<number | null>(null);
+  const yearDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Config solo con Reportes a Tiempo para usar KpiAnalysisPanel genérico
+  const reportesOnlyConfig: KpiDefinition = useMemo(() => ({
+    ...CUMPLIMIENTO_CONFIG,
+    summaries: [CUMPLIMIENTO_CONFIG.summaries[0]] // Solo el primer summary (Reportes a Tiempo)
+  }), []);
 
   // Cerrar dropdowns al hacer click fuera
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (yearDropdownRef.current && !yearDropdownRef.current.contains(event.target as Node)) {
-        setIsDropdownOpen(false);
-      }
       if (metricDropdownRef.current && !metricDropdownRef.current.contains(event.target as Node)) {
         setIsMetricDropdownOpen(false);
+      }
+      if (yearDropdownRef.current && !yearDropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
       }
     };
     
@@ -90,73 +84,47 @@ export function RegulatoryComplianceAnalysisPanel({
     };
   }, []);
 
-  // Cargar datos
+  // Cargar datos de Observaciones
   useEffect(() => {
-    const loadData = async () => {
+    const loadObservaciones = async () => {
       setLoading(true);
       try {
-        const [obsResult, repResult] = await Promise.all([
-          supabase
-            .from('kpi_cumplimiento_resumen_2')
-            .select('*')
-            .eq('is_current', true)
-            .order('anio', { ascending: true })
-            .order('mes', { ascending: true }),
-          supabase
-            .from('kpi_cumplimiento_resumen_1')
-            .select('*')
-            .eq('is_current', true)
-            .order('anio', { ascending: true })
-            .order('mes', { ascending: true })
-        ]);
+        const { data, error } = await supabase
+          .from('kpi_cumplimiento_resumen_2')
+          .select('*')
+          .eq('is_current', true)
+          .order('anio', { ascending: true })
+          .order('mes', { ascending: true });
 
-        if (obsResult.error) throw obsResult.error;
-        if (repResult.error) throw repResult.error;
-
-        setObservacionesData((obsResult.data || []) as ObservacionRecord[]);
-        setReportesData((repResult.data || []) as ReportesRecord[]);
+        if (error) throw error;
+        setObservacionesData((data || []) as ObservacionRecord[]);
       } catch (err) {
-        console.error('Error loading compliance data:', err);
+        console.error('Error loading observaciones:', err);
         setObservacionesData([]);
-        setReportesData([]);
       } finally {
         setLoading(false);
       }
     };
 
-    loadData();
-  }, []);
+    if (selectedMetric === 'observaciones') {
+      loadObservaciones();
+    }
+  }, [selectedMetric]);
 
-  // Años disponibles por tipo de métrica
-  const reportesYears = useMemo(() => {
-    return Array.from(new Set(reportesData.map(r => r.anio))).sort((a, b) => b - a);
-  }, [reportesData]);
-
+  // Años disponibles para Observaciones
   const observacionesYears = useMemo(() => {
     return Array.from(new Set(observacionesData.map(r => r.anio))).sort((a, b) => b - a);
   }, [observacionesData]);
 
-  // Años disponibles según métrica seleccionada
-  const availableYears = useMemo(() => {
-    return selectedMetric === 'reportes' ? reportesYears : observacionesYears;
-  }, [selectedMetric, reportesYears, observacionesYears]);
-
-  // Colores para años en gráficas
+  // Colores para años
   const yearColors: Record<number, string> = useMemo(() => {
-    const palette = [
-      '#059669', // Emerald 600
-      '#2563eb', // Blue 600
-      '#d97706', // Amber 600
-      '#dc2626', // Red 600
-      '#7c3aed', // Violet 600
-    ];
+    const palette = ['#059669', '#2563eb', '#d97706', '#dc2626', '#7c3aed'];
     const colors: Record<number, string> = {};
-    const allYears = [...new Set([...reportesYears, ...observacionesYears])].sort((a, b) => b - a);
-    allYears.forEach((year: number, index: number) => {
+    observacionesYears.forEach((year, index) => {
       colors[year] = palette[index % palette.length];
     });
     return colors;
-  }, [reportesYears, observacionesYears]);
+  }, [observacionesYears]);
 
   // Datos del año seleccionado
   const currentYearObservaciones = useMemo(() => {
@@ -165,43 +133,20 @@ export function RegulatoryComplianceAnalysisPanel({
       .sort((a, b) => a.mes - b.mes);
   }, [observacionesData, selectedYear]);
 
-  const currentYearReportes = useMemo(() => {
-    return reportesData
-      .filter(r => r.anio === selectedYear)
-      .sort((a, b) => a.mes - b.mes);
-  }, [reportesData, selectedYear]);
-
-  // Datos para gráfica de tendencia mensual - REPORTES
-  const reportesChartData = useMemo(() => {
-    return MONTH_NAMES.map((mes, index) => {
-      const monthNum = index + 1;
-      const point: Record<string, string | number | null> = { mes };
-      
-      reportesYears.forEach(year => {
-        const record = reportesData.find(r => r.anio === year && r.mes === monthNum);
-        point[`año_${year}`] = record ? record.reportes_a_tiempo : null;
-      });
-      
-      return point;
-    });
-  }, [reportesYears, reportesData]);
-
-  // Datos para gráfica de tendencia mensual - OBSERVACIONES
+  // Datos para gráfica
   const observacionesChartData = useMemo(() => {
     return MONTH_NAMES.map((mes, index) => {
       const monthNum = index + 1;
       const point: Record<string, string | number | null> = { mes };
-      
       observacionesYears.forEach(year => {
         const record = observacionesData.find(r => r.anio === year && r.mes === monthNum);
         point[`año_${year}`] = record ? record.observaciones_cnbv_condusef : null;
       });
-      
       return point;
     });
   }, [observacionesYears, observacionesData]);
 
-  // Métricas calculadas para Observaciones
+  // Métricas calculadas
   const observacionesMetrics = useMemo(() => {
     if (currentYearObservaciones.length === 0) return null;
 
@@ -212,7 +157,6 @@ export function RegulatoryComplianceAnalysisPanel({
       r => r.descripcion_observaciones && r.descripcion_observaciones.trim().length > 0
     );
 
-    // Tendencia
     const primerSemestre = currentYearObservaciones.filter(r => r.mes <= 6);
     const segundoSemestre = currentYearObservaciones.filter(r => r.mes > 6);
     const obsPrimerSemestre = primerSemestre.reduce((sum, r) => sum + (r.observaciones_cnbv_condusef || 0), 0);
@@ -232,187 +176,44 @@ export function RegulatoryComplianceAnalysisPanel({
     };
   }, [currentYearObservaciones]);
 
-  // Métricas calculadas para Reportes
-  const reportesMetrics = useMemo(() => {
-    if (currentYearReportes.length === 0) return null;
-
-    const promedioReportes = currentYearReportes.reduce((sum, r) => sum + (r.reportes_a_tiempo || 0), 0) / currentYearReportes.length;
-    const metaReportes = currentYearReportes[0]?.meta || 100;
-    const metaAnualReportes = currentYearReportes[0]?.meta_anual || 100;
-    const ultimoMes = Math.max(...currentYearReportes.map(r => r.mes));
-    const ultimoValor = currentYearReportes.find(r => r.mes === ultimoMes)?.reportes_a_tiempo || 0;
-
-    // Comparar con año anterior
-    const yearAnterior = selectedYear - 1;
-    const datosAnterior = reportesData.filter(r => r.anio === yearAnterior);
-    const promedioAnterior = datosAnterior.length > 0
-      ? datosAnterior.reduce((sum, r) => sum + (r.reportes_a_tiempo || 0), 0) / datosAnterior.length
-      : null;
-    const cambioVsAnterior = promedioAnterior !== null ? promedioReportes - promedioAnterior : null;
-
-    return {
-      promedioReportes,
-      metaReportes,
-      metaAnualReportes,
-      ultimoMes,
-      ultimoValor,
-      totalMeses: currentYearReportes.length,
-      cambioVsAnterior,
-      cumplimiento: promedioReportes >= metaAnualReportes
-    };
-  }, [currentYearReportes, reportesData, selectedYear]);
-
-  // Datos para gráfica mensual de Reportes (con meta)
-  const reportesMonthlyData = useMemo(() => {
-    return MONTH_NAMES.map((mes, index) => {
-      const monthNum = index + 1;
-      const point: Record<string, string | number | null> = { mes };
-      
-      reportesYears.forEach(year => {
-        const record = reportesData.find(r => r.anio === year && r.mes === monthNum);
-        point[`valor_${year}`] = record ? record.reportes_a_tiempo : null;
-      });
-      
-      // Meta mensual del año seleccionado
-      const selectedRecord = reportesData.find(r => r.anio === selectedYear && r.mes === monthNum);
-      point['meta'] = selectedRecord?.meta ?? null;
-      
-      return point;
-    });
-  }, [reportesYears, reportesData, selectedYear]);
-
-  // Datos acumulados para Reportes (promedio porque es porcentaje)
-  const reportesAccumulatedData = useMemo(() => {
-    return MONTH_NAMES.map((mes, index) => {
-      const monthNum = index + 1;
-      const point: Record<string, string | number | null> = { mes };
-      
-      reportesYears.forEach(year => {
-        const yearData = reportesData.filter(r => r.anio === year && r.mes <= monthNum);
-        if (yearData.length > 0) {
-          const avg = yearData.reduce((sum, r) => sum + (r.reportes_a_tiempo || 0), 0) / yearData.length;
-          point[`acumulado_${year}`] = avg;
-        } else {
-          point[`acumulado_${year}`] = null;
-        }
-      });
-      
-      // Meta anual como línea de referencia
-      const metaAnual = currentYearReportes[0]?.meta_anual || null;
-      point['meta_anual'] = metaAnual;
-      
-      return point;
-    });
-  }, [reportesYears, reportesData, currentYearReportes]);
-
-  // Comparativas mensuales para Reportes
-  const reportesMonthlyComparison = useMemo(() => {
-    if (!reportesMetrics) return null;
-    const currentMonth = reportesMetrics.ultimoMes;
-    const currentValue = reportesMetrics.ultimoValor;
-    
-    const comparisons: { year: number; value: number; change: number }[] = [];
-    
-    reportesYears.filter(y => y !== selectedYear).forEach(year => {
-      const record = reportesData.find(r => r.anio === year && r.mes === currentMonth);
-      if (record) {
-        comparisons.push({
-          year,
-          value: record.reportes_a_tiempo,
-          change: currentValue - record.reportes_a_tiempo
-        });
-      }
-    });
-    
-    return comparisons;
-  }, [reportesMetrics, reportesYears, reportesData, selectedYear]);
-
-  // Comparativas acumuladas para Reportes
-  const reportesAccumulatedComparison = useMemo(() => {
-    if (!reportesMetrics) return null;
-    const currentMonth = reportesMetrics.ultimoMes;
-    const currentAccum = reportesMetrics.promedioReportes;
-    
-    const comparisons: { year: number; value: number; change: number }[] = [];
-    
-    reportesYears.filter(y => y !== selectedYear).forEach(year => {
-      const yearData = reportesData.filter(r => r.anio === year && r.mes <= currentMonth);
-      if (yearData.length > 0) {
-        const avg = yearData.reduce((sum, r) => sum + (r.reportes_a_tiempo || 0), 0) / yearData.length;
-        comparisons.push({
-          year,
-          value: avg,
-          change: currentAccum - avg
-        });
-      }
-    });
-    
-    return comparisons;
-  }, [reportesMetrics, reportesYears, reportesData, selectedYear]);
-
-  // Vista de loading
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="flex items-center gap-3 text-soft-slate">
-          <Loader2 className="animate-spin" size={24} />
-          <span>Cargando análisis regulatorio...</span>
-        </div>
-      </div>
-    );
-  }
-
   const metricLabels: Record<MetricType, { label: string; icon: typeof Shield }> = {
     reportes: { label: 'Reportes a Tiempo', icon: FileText },
     observaciones: { label: 'Observaciones CNBV/CONDUSEF', icon: AlertCircle }
   };
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="glass-panel"
-    >
-      {/* Header */}
-      <div className="p-4 md:p-5 border-b border-white/60">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-gradient-to-br from-teal-500 to-blue-600 shadow-lg">
-              <BarChart2 className="text-white" size={20} />
+  // Si está seleccionado REPORTES, usar KpiAnalysisPanel genérico
+  if (selectedMetric === 'reportes') {
+    return (
+      <div className="space-y-4">
+        {/* Selector de métrica */}
+        <div className="glass-panel p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-gradient-to-br from-teal-500 to-blue-600 shadow-lg">
+                <BarChart2 className="text-white" size={20} />
+              </div>
+              <div>
+                <h3 className="text-vision-ink font-semibold text-base">Seleccionar Métrica</h3>
+                <p className="text-soft-slate text-xs">Elige qué indicador analizar</p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-vision-ink font-semibold text-base md:text-lg">Panel de Análisis</h3>
-              <p className="text-soft-slate text-xs md:text-sm">{metricLabels[selectedMetric].label}</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/* Selector de métrica */}
+            
             <div ref={metricDropdownRef} className="relative z-50">
               <button
                 onClick={() => setIsMetricDropdownOpen(!isMetricDropdownOpen)}
-                className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-2 bg-white/80 hover:bg-white 
+                className="flex items-center gap-2 px-3 py-2 bg-white/80 hover:bg-white 
                          rounded-xl border border-slate-200 transition-all duration-200 shadow-soft"
               >
-                {selectedMetric === 'reportes' ? (
-                  <FileText size={14} className="text-blue-500 flex-shrink-0" />
-                ) : (
-                  <AlertCircle size={14} className="text-rose-500 flex-shrink-0" />
-                )}
-                <span className="text-vision-ink font-medium text-sm hidden sm:inline">
-                  {metricLabels[selectedMetric].label}
-                </span>
-                <span className="text-vision-ink font-medium text-sm sm:hidden">
-                  {selectedMetric === 'reportes' ? 'Reportes' : 'Observaciones'}
-                </span>
+                <FileText size={14} className="text-blue-500" />
+                <span className="text-vision-ink font-medium text-sm">{metricLabels[selectedMetric].label}</span>
                 <ChevronDown 
                   size={14} 
-                  className={`text-soft-slate transition-transform duration-200 flex-shrink-0 ${isMetricDropdownOpen ? 'rotate-180' : ''}`} 
+                  className={`text-soft-slate transition-transform duration-200 ${isMetricDropdownOpen ? 'rotate-180' : ''}`} 
                 />
               </button>
               
               {isMetricDropdownOpen && (
-                <div className="absolute right-0 top-full mt-1 w-max min-w-[200px] bg-white rounded-xl border border-slate-200 shadow-2xl z-[9999]">
+                <div className="absolute right-0 top-full mt-1 w-max min-w-[220px] bg-white rounded-xl border border-slate-200 shadow-2xl z-[9999]">
                   {(Object.keys(metricLabels) as MetricType[]).map((metric) => {
                     const Icon = metricLabels[metric].icon;
                     return (
@@ -425,7 +226,7 @@ export function RegulatoryComplianceAnalysisPanel({
                         className={`w-full px-4 py-3 text-left transition-all duration-150 first:rounded-t-xl last:rounded-b-xl flex items-center gap-2
                                   ${selectedMetric === metric 
                                     ? 'bg-plasma-blue/10 text-plasma-blue' 
-                                    : 'text-vision-ink hover:bg-slate-50 active:bg-slate-100'}`}
+                                    : 'text-vision-ink hover:bg-slate-50'}`}
                       >
                         <Icon size={16} />
                         <span className="font-medium text-sm">{metricLabels[metric].label}</span>
@@ -435,25 +236,109 @@ export function RegulatoryComplianceAnalysisPanel({
                 </div>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* Panel de Análisis Genérico para Reportes */}
+        <KpiAnalysisPanel config={reportesOnlyConfig} filters={filters} />
+      </div>
+    );
+  }
+
+  // Panel especializado para OBSERVACIONES
+  return (
+    <div className="space-y-4">
+      {/* Selector de métrica */}
+      <div className="glass-panel p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-gradient-to-br from-teal-500 to-blue-600 shadow-lg">
+              <BarChart2 className="text-white" size={20} />
+            </div>
+            <div>
+              <h3 className="text-vision-ink font-semibold text-base">Seleccionar Métrica</h3>
+              <p className="text-soft-slate text-xs">Elige qué indicador analizar</p>
+            </div>
+          </div>
+          
+          <div ref={metricDropdownRef} className="relative z-50">
+            <button
+              onClick={() => setIsMetricDropdownOpen(!isMetricDropdownOpen)}
+              className="flex items-center gap-2 px-3 py-2 bg-white/80 hover:bg-white 
+                       rounded-xl border border-slate-200 transition-all duration-200 shadow-soft"
+            >
+              <AlertCircle size={14} className="text-rose-500" />
+              <span className="text-vision-ink font-medium text-sm">{metricLabels[selectedMetric].label}</span>
+              <ChevronDown 
+                size={14} 
+                className={`text-soft-slate transition-transform duration-200 ${isMetricDropdownOpen ? 'rotate-180' : ''}`} 
+              />
+            </button>
+            
+            {isMetricDropdownOpen && (
+              <div className="absolute right-0 top-full mt-1 w-max min-w-[220px] bg-white rounded-xl border border-slate-200 shadow-2xl z-[9999]">
+                {(Object.keys(metricLabels) as MetricType[]).map((metric) => {
+                  const Icon = metricLabels[metric].icon;
+                  return (
+                    <button
+                      key={metric}
+                      onClick={() => {
+                        setSelectedMetric(metric);
+                        setIsMetricDropdownOpen(false);
+                      }}
+                      className={`w-full px-4 py-3 text-left transition-all duration-150 first:rounded-t-xl last:rounded-b-xl flex items-center gap-2
+                                ${selectedMetric === metric 
+                                  ? 'bg-plasma-blue/10 text-plasma-blue' 
+                                  : 'text-vision-ink hover:bg-slate-50'}`}
+                    >
+                      <Icon size={16} />
+                      <span className="font-medium text-sm">{metricLabels[metric].label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Panel de Observaciones */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="glass-panel"
+      >
+        {/* Header */}
+        <div className="p-4 md:p-5 border-b border-white/60">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-gradient-to-br from-rose-500 to-red-600 shadow-lg">
+                <AlertCircle className="text-white" size={20} />
+              </div>
+              <div>
+                <h3 className="text-vision-ink font-semibold text-base md:text-lg">Panel de Análisis</h3>
+                <p className="text-soft-slate text-xs md:text-sm">Observaciones CNBV/CONDUSEF</p>
+              </div>
+            </div>
 
             {/* Selector de año */}
-            <div ref={yearDropdownRef} className="relative z-50 flex-shrink-0">
+            <div ref={yearDropdownRef} className="relative z-50">
               <button
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-2 bg-white/80 hover:bg-white 
-                         rounded-xl border border-slate-200 transition-all duration-200 min-w-[85px] md:min-w-[100px] shadow-soft"
+                className="flex items-center gap-2 px-3 py-2 bg-white/80 hover:bg-white 
+                         rounded-xl border border-slate-200 transition-all duration-200 shadow-soft"
               >
-                <Calendar size={14} className="text-plasma-blue flex-shrink-0" />
-                <span className="text-vision-ink font-medium text-sm">{selectedYear || 'Año'}</span>
+                <Calendar size={14} className="text-plasma-blue" />
+                <span className="text-vision-ink font-medium text-sm">{selectedYear}</span>
                 <ChevronDown 
                   size={14} 
-                  className={`text-soft-slate ml-auto transition-transform duration-200 flex-shrink-0 ${isDropdownOpen ? 'rotate-180' : ''}`} 
+                  className={`text-soft-slate transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} 
                 />
               </button>
               
               {isDropdownOpen && (
                 <div className="absolute right-0 top-full mt-1 w-max min-w-[120px] bg-white rounded-xl border border-slate-200 shadow-2xl z-[9999]">
-                  {availableYears.map((year: number) => (
+                  {observacionesYears.map((year) => (
                     <button
                       key={year}
                       onClick={() => {
@@ -463,7 +348,7 @@ export function RegulatoryComplianceAnalysisPanel({
                       className={`w-full px-4 py-3 text-left transition-all duration-150 first:rounded-t-xl last:rounded-b-xl flex items-center gap-2
                                 ${selectedYear === year 
                                   ? 'bg-plasma-blue/10 text-plasma-blue' 
-                                  : 'text-vision-ink hover:bg-slate-50 active:bg-slate-100'}`}
+                                  : 'text-vision-ink hover:bg-slate-50'}`}
                     >
                       <div 
                         className="w-2.5 h-2.5 rounded-full ring-2 ring-white shadow-sm" 
@@ -476,34 +361,8 @@ export function RegulatoryComplianceAnalysisPanel({
               )}
             </div>
           </div>
-        </div>
 
-        {/* Tabs de vista para REPORTES - Formato estándar */}
-        {selectedMetric === 'reportes' && (
-          <div className="flex flex-wrap gap-1.5">
-            {[
-              { id: 'overview', label: 'Resumen', icon: Activity },
-              { id: 'monthly', label: 'Mensual', icon: Calendar },
-              { id: 'accumulated', label: 'Acumulado', icon: TrendingUp },
-              { id: 'annual', label: 'Meta Anual', icon: Target }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setReportesView(tab.id as ReportesView)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200
-                          ${reportesView === tab.id 
-                            ? 'bg-plasma-blue text-white shadow-md shadow-plasma-blue/25' 
-                            : 'text-soft-slate hover:text-vision-ink hover:bg-slate-100'}`}
-              >
-                <tab.icon size={14} />
-                <span className="hidden sm:inline">{tab.label}</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Tabs de vista para OBSERVACIONES - Formato especial */}
-        {selectedMetric === 'observaciones' && (
+          {/* Tabs */}
           <div className="flex flex-wrap gap-1.5">
             {[
               { id: 'overview', label: 'Resumen', icon: Activity },
@@ -523,816 +382,415 @@ export function RegulatoryComplianceAnalysisPanel({
               </button>
             ))}
           </div>
-        )}
-      </div>
+        </div>
 
-      {/* Contenido */}
-      <div className="p-4 md:p-5">
-        <AnimatePresence mode="wait">
-          {/* Vista Overview para REPORTES */}
-          {reportesView === 'overview' && selectedMetric === 'reportes' && reportesMetrics && (
-            <motion.div
-              key="overview-reportes"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="space-y-4"
-            >
-              {/* Métricas principales */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {/* Valor actual */}
-                <div className="bg-gradient-to-br from-emerald-50 to-teal-50/50 rounded-2xl p-4 border border-emerald-100 shadow-soft">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-soft-slate text-sm">Reportes a Tiempo (%) - {FULL_MONTH_NAMES[reportesMetrics.ultimoMes - 1]}</span>
-                    <div className="p-1.5 rounded-lg bg-emerald-100">
-                      <Clock size={14} className="text-emerald-600" />
-                    </div>
-                  </div>
-                  <p className="text-2xl font-bold text-vision-ink mb-1">{reportesMetrics.ultimoValor.toFixed(2)}%</p>
-                </div>
-
-                {/* Acumulado/Promedio */}
-                <div className="bg-gradient-to-br from-indigo-50 to-purple-50/50 rounded-2xl p-4 border border-indigo-100 shadow-soft">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-soft-slate text-sm">Acumulado {selectedYear}</span>
-                    <div className="p-1.5 rounded-lg bg-indigo-100">
-                      <TrendingUp size={14} className="text-indigo-600" />
-                    </div>
-                  </div>
-                  <p className="text-2xl font-bold text-vision-ink mb-1">{reportesMetrics.promedioReportes.toFixed(2)}%</p>
-                  {reportesMetrics.cambioVsAnterior !== null && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-soft-slate text-xs">vs año anterior:</span>
-                      <span className={`text-xs font-medium ${reportesMetrics.cambioVsAnterior >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
-                        {reportesMetrics.cambioVsAnterior >= 0 ? '+' : ''}{reportesMetrics.cambioVsAnterior.toFixed(2)}%
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Meta anual */}
-                <div className="bg-gradient-to-br from-amber-50 to-orange-50/50 rounded-2xl p-4 border border-amber-100 shadow-soft">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-soft-slate text-sm">Avance Meta Anual</span>
-                    <div className="p-1.5 rounded-lg bg-amber-100">
-                      {reportesMetrics.cumplimiento ? (
-                        <CheckCircle2 size={14} className="text-emerald-600" />
-                      ) : (
-                        <AlertTriangle size={14} className="text-amber-600" />
-                      )}
-                    </div>
-                  </div>
-                  <p className="text-2xl font-bold text-vision-ink mb-1">
-                    {((reportesMetrics.promedioReportes / reportesMetrics.metaAnualReportes) * 100).toFixed(1)}%
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <span className="text-soft-slate text-xs">Meta:</span>
-                    <span className="text-vision-ink/80 text-sm font-medium">{reportesMetrics.metaAnualReportes}%</span>
-                  </div>
-                </div>
+        {/* Contenido */}
+        <div className="p-4 md:p-5">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="flex items-center gap-3 text-soft-slate">
+                <Loader2 className="animate-spin" size={24} />
+                <span>Cargando observaciones...</span>
               </div>
-
-              {/* Comparativas */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {/* Comparativa Mensual */}
-                <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 border border-white/80 shadow-soft">
-                  <h4 className="text-soft-slate text-sm mb-3">Comparativa Mensual ({FULL_MONTH_NAMES[reportesMetrics.ultimoMes - 1]})</h4>
-                  {reportesMonthlyComparison && reportesMonthlyComparison.length > 0 ? (
-                    <div className="space-y-2">
-                      {reportesMonthlyComparison.map(comp => (
-                        <div key={comp.year} className="flex items-center justify-between">
-                          <span className="text-vision-ink text-sm">{comp.year}: {comp.value.toFixed(2)}%</span>
-                          <span className={`text-sm font-medium ${comp.change >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
-                            {comp.change >= 0 ? '+' : ''}{comp.change.toFixed(2)}%
-                          </span>
+            </div>
+          ) : (
+            <AnimatePresence mode="wait">
+              {/* Vista Resumen */}
+              {observacionesView === 'overview' && observacionesMetrics && (
+                <motion.div
+                  key="overview"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  className="space-y-4"
+                >
+                  {/* Métricas principales */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {/* Total Observaciones */}
+                    <div className={`rounded-2xl p-4 border shadow-soft ${
+                      observacionesMetrics.totalObservaciones === 0 
+                        ? 'bg-gradient-to-br from-emerald-50 to-teal-50/50 border-emerald-100'
+                        : 'bg-gradient-to-br from-rose-50 to-red-50/50 border-rose-100'
+                    }`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-soft-slate text-sm">Observaciones {selectedYear}</span>
+                        <div className={`p-1.5 rounded-lg ${
+                          observacionesMetrics.totalObservaciones === 0 ? 'bg-emerald-100' : 'bg-rose-100'
+                        }`}>
+                          {observacionesMetrics.totalObservaciones === 0 ? (
+                            <CheckCircle2 size={14} className="text-emerald-600" />
+                          ) : (
+                            <AlertTriangle size={14} className="text-rose-600" />
+                          )}
                         </div>
-                      ))}
+                      </div>
+                      <p className="text-3xl font-bold text-vision-ink mb-1">
+                        {observacionesMetrics.totalObservaciones}
+                      </p>
+                      <p className="text-xs text-soft-slate">
+                        Meta: {observacionesMetrics.metaAnualObs} observaciones
+                      </p>
                     </div>
-                  ) : (
-                    <p className="text-soft-slate/60 text-sm">Sin datos de años anteriores</p>
-                  )}
-                </div>
 
-                {/* Comparativa Acumulada */}
-                <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 border border-white/80 shadow-soft">
-                  <h4 className="text-soft-slate text-sm mb-3">Comparativa Acumulado</h4>
-                  {reportesAccumulatedComparison && reportesAccumulatedComparison.length > 0 ? (
-                    <div className="space-y-2">
-                      {reportesAccumulatedComparison.map(comp => (
-                        <div key={comp.year} className="flex items-center justify-between">
-                          <span className="text-vision-ink text-sm">{comp.year}: {comp.value.toFixed(2)}%</span>
-                          <span className={`text-sm font-medium ${comp.change >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
-                            {comp.change >= 0 ? '+' : ''}{comp.change.toFixed(2)}%
-                          </span>
+                    {/* Meses con observaciones */}
+                    <div className="bg-gradient-to-br from-amber-50 to-orange-50/50 rounded-2xl p-4 border border-amber-100 shadow-soft">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-soft-slate text-sm">Meses Afectados</span>
+                        <div className="p-1.5 rounded-lg bg-amber-100">
+                          <Calendar size={14} className="text-amber-600" />
                         </div>
-                      ))}
+                      </div>
+                      <p className="text-3xl font-bold text-vision-ink mb-1">
+                        {observacionesMetrics.mesesConObservaciones}
+                      </p>
+                      <p className="text-xs text-soft-slate">
+                        de {observacionesMetrics.totalMeses} meses registrados
+                      </p>
                     </div>
-                  ) : (
-                    <p className="text-soft-slate/60 text-sm">Sin datos de años anteriores</p>
-                  )}
-                </div>
-              </div>
 
-              {/* Gráfica de tendencia */}
-              <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 border border-white/80 shadow-soft">
-                <h4 className="text-vision-ink font-medium text-sm mb-4">Tendencia Mensual por Año</h4>
-                <div className="h-64 md:h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={reportesChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                      <defs>
-                        {reportesYears.map((year: number, idx: number) => (
-                          <linearGradient key={year} id={`gradient-rep-${year}`} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={yearColors[year]} stopOpacity={idx === 0 ? 0.25 : 0.08} />
-                            <stop offset="95%" stopColor={yearColors[year]} stopOpacity={0} />
-                          </linearGradient>
-                        ))}
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.3)" />
-                      <XAxis dataKey="mes" stroke="#64748b" fontSize={12} />
-                      <YAxis 
-                        stroke="#64748b" 
-                        fontSize={12} 
-                        tickFormatter={(v: number) => `${v}%`}
-                        domain={[0, 100]}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                          border: '1px solid rgba(148,163,184,0.3)',
-                          borderRadius: '12px',
-                          boxShadow: '0 8px 32px rgba(0,0,0,0.12)'
-                        }}
-                        labelStyle={{ color: '#0f172a', fontWeight: 'bold' }}
-                        formatter={(value: number, name: string) => {
-                          const year = name.split('_')[1];
-                          return [`${value?.toFixed(2) || '-'}%`, year];
-                        }}
-                      />
-                      <Legend 
-                        formatter={(value: string) => {
-                          const year = value.split('_')[1];
-                          return <span style={{ color: yearColors[Number(year)], fontWeight: 600 }}>{year}</span>;
-                        }}
-                      />
-                      {[...reportesYears].sort((a, b) => a - b).map((year: number) => (
-                        <Area
-                          key={year}
-                          type="monotone"
-                          dataKey={`año_${year}`}
-                          stroke={yearColors[year]}
-                          strokeWidth={year === selectedYear ? 3 : 1.5}
-                          fill={`url(#gradient-rep-${year})`}
-                          dot={{ fill: yearColors[year], strokeWidth: 0, r: year === selectedYear ? 4 : 2 }}
-                          activeDot={{ r: 6, strokeWidth: 2, stroke: '#fff' }}
-                          connectNulls
-                        />
-                      ))}
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </motion.div>
-          )}
+                    {/* Con descripción */}
+                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50/50 rounded-2xl p-4 border border-blue-100 shadow-soft">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-soft-slate text-sm">Con Descripción</span>
+                        <div className="p-1.5 rounded-lg bg-blue-100">
+                          <FileText size={14} className="text-blue-600" />
+                        </div>
+                      </div>
+                      <p className="text-3xl font-bold text-vision-ink mb-1">
+                        {observacionesMetrics.observacionesConDescripcion}
+                      </p>
+                      <p className="text-xs text-soft-slate">
+                        observaciones documentadas
+                      </p>
+                    </div>
 
-          {/* Vista MENSUAL para REPORTES */}
-          {reportesView === 'monthly' && selectedMetric === 'reportes' && reportesMetrics && (
-            <motion.div
-              key="monthly-reportes"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="space-y-4"
-            >
-              <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 border border-white/80 shadow-soft">
-                <h4 className="text-vision-ink font-medium text-sm mb-4">Comparativa Mensual por Año</h4>
-                <div className="h-72 md:h-96">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={reportesMonthlyData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.3)" />
-                      <XAxis dataKey="mes" stroke="#64748b" fontSize={12} />
-                      <YAxis 
-                        stroke="#64748b" 
-                        fontSize={12} 
-                        tickFormatter={(v: number) => `${v}%`}
-                        domain={[0, 100]}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                          border: '1px solid rgba(148,163,184,0.3)',
-                          borderRadius: '12px',
-                          boxShadow: '0 8px 32px rgba(0,0,0,0.12)'
-                        }}
-                        labelStyle={{ color: '#0f172a', fontWeight: 'bold' }}
-                        formatter={(value: number, name: string) => {
-                          if (name === 'meta') return [`${value?.toFixed(2) || '-'}%`, 'Meta'];
-                          const year = name.split('_')[1];
-                          return [`${value?.toFixed(2) || '-'}%`, year];
-                        }}
-                      />
-                      <Legend 
-                        formatter={(value: string) => {
-                          if (value === 'meta') return <span style={{ color: '#dc2626', fontWeight: 600 }}>Meta</span>;
-                          const year = value.split('_')[1];
-                          return <span style={{ color: yearColors[Number(year)], fontWeight: 600 }}>{year}</span>;
-                        }}
-                      />
-                      {[...reportesYears].sort((a, b) => a - b).map((year: number) => (
-                        <Bar
-                          key={year}
-                          dataKey={`valor_${year}`}
-                          fill={yearColors[year]}
-                          radius={[4, 4, 0, 0]}
-                          opacity={year === selectedYear ? 1 : 0.6}
-                        />
-                      ))}
-                      <ReferenceLine y={reportesMetrics.metaReportes} stroke="#dc2626" strokeDasharray="5 5" strokeWidth={2} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </motion.div>
-          )}
+                    {/* Tendencia */}
+                    <div className="bg-gradient-to-br from-violet-50 to-purple-50/50 rounded-2xl p-4 border border-violet-100 shadow-soft">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-soft-slate text-sm">Tendencia</span>
+                        <div className="p-1.5 rounded-lg bg-violet-100">
+                          <TrendingDown size={14} className="text-violet-600" />
+                        </div>
+                      </div>
+                      <p className={`text-3xl font-bold mb-1 ${
+                        observacionesMetrics.tendencia <= 0 ? 'text-emerald-600' : 'text-rose-600'
+                      }`}>
+                        {observacionesMetrics.tendencia > 0 ? '+' : ''}{observacionesMetrics.tendencia.toFixed(1)}%
+                      </p>
+                      <p className="text-xs text-soft-slate">
+                        {observacionesMetrics.tendencia <= 0 ? 'Mejorando' : 'Empeorando'}
+                      </p>
+                    </div>
+                  </div>
 
-          {/* Vista ACUMULADO para REPORTES */}
-          {reportesView === 'accumulated' && selectedMetric === 'reportes' && reportesMetrics && (
-            <motion.div
-              key="accumulated-reportes"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="space-y-4"
-            >
-              <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 border border-white/80 shadow-soft">
-                <h4 className="text-vision-ink font-medium text-sm mb-4">Acumulado (Promedio) por Año</h4>
-                <div className="h-72 md:h-96">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={reportesAccumulatedData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                      <defs>
-                        {reportesYears.map((year: number, idx: number) => (
-                          <linearGradient key={year} id={`gradient-acc-${year}`} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={yearColors[year]} stopOpacity={idx === 0 ? 0.25 : 0.08} />
-                            <stop offset="95%" stopColor={yearColors[year]} stopOpacity={0} />
-                          </linearGradient>
-                        ))}
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.3)" />
-                      <XAxis dataKey="mes" stroke="#64748b" fontSize={12} />
-                      <YAxis 
-                        stroke="#64748b" 
-                        fontSize={12} 
-                        tickFormatter={(v: number) => `${v}%`}
-                        domain={[0, 100]}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                          border: '1px solid rgba(148,163,184,0.3)',
-                          borderRadius: '12px',
-                          boxShadow: '0 8px 32px rgba(0,0,0,0.12)'
-                        }}
-                        labelStyle={{ color: '#0f172a', fontWeight: 'bold' }}
-                        formatter={(value: number, name: string) => {
-                          if (name === 'meta_anual') return [`${value?.toFixed(2) || '-'}%`, 'Meta Anual'];
-                          const year = name.split('_')[1];
-                          return [`${value?.toFixed(2) || '-'}%`, year];
-                        }}
-                      />
-                      <Legend 
-                        formatter={(value: string) => {
-                          if (value === 'meta_anual') return <span style={{ color: '#dc2626', fontWeight: 600 }}>Meta Anual</span>;
-                          const year = value.split('_')[1];
-                          return <span style={{ color: yearColors[Number(year)], fontWeight: 600 }}>{year}</span>;
-                        }}
-                      />
-                      {[...reportesYears].sort((a, b) => a - b).map((year: number) => (
-                        <Area
-                          key={year}
-                          type="monotone"
-                          dataKey={`acumulado_${year}`}
-                          stroke={yearColors[year]}
-                          strokeWidth={year === selectedYear ? 3 : 1.5}
-                          fill={`url(#gradient-acc-${year})`}
-                          dot={{ fill: yearColors[year], strokeWidth: 0, r: year === selectedYear ? 4 : 2 }}
-                          activeDot={{ r: 6, strokeWidth: 2, stroke: '#fff' }}
-                          connectNulls
-                        />
-                      ))}
-                      <ReferenceLine y={reportesMetrics.metaAnualReportes} stroke="#dc2626" strokeDasharray="5 5" strokeWidth={2} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Vista META ANUAL para REPORTES */}
-          {reportesView === 'annual' && selectedMetric === 'reportes' && reportesMetrics && (
-            <motion.div
-              key="annual-reportes"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="space-y-4"
-            >
-              {/* Tarjeta de meta anual */}
-              <div className={`rounded-2xl p-6 border shadow-soft ${
-                reportesMetrics.cumplimiento
-                  ? 'bg-gradient-to-br from-emerald-50 to-teal-100/60 border-emerald-200'
-                  : 'bg-gradient-to-br from-amber-50 to-orange-100/60 border-amber-200'
-              }`}>
-                <div className="flex items-start gap-4">
-                  <div className={`p-3 rounded-xl shadow-lg ${
-                    reportesMetrics.cumplimiento
-                      ? 'bg-gradient-to-br from-emerald-500 to-teal-600'
-                      : 'bg-gradient-to-br from-amber-500 to-orange-600'
+                  {/* Estado de cumplimiento */}
+                  <div className={`rounded-2xl p-5 border ${
+                    observacionesMetrics.cumplimiento
+                      ? 'bg-gradient-to-br from-emerald-50 to-teal-100/60 border-emerald-200'
+                      : 'bg-gradient-to-br from-rose-50 to-red-100/60 border-rose-200'
                   }`}>
-                    <Target className="text-white" size={24} />
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="text-vision-ink font-bold text-lg mb-2">
-                      {reportesMetrics.cumplimiento ? 'Cumpliendo Meta Anual' : 'Por Debajo de Meta Anual'}
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-                      <div>
-                        <p className="text-soft-slate text-sm mb-1">Meta Anual</p>
-                        <p className="text-2xl font-bold text-vision-ink">{reportesMetrics.metaAnualReportes}%</p>
+                    <div className="flex items-start gap-4">
+                      <div className={`p-3 rounded-xl shadow-lg ${
+                        observacionesMetrics.cumplimiento
+                          ? 'bg-gradient-to-br from-emerald-500 to-teal-600'
+                          : 'bg-gradient-to-br from-rose-500 to-red-600'
+                      }`}>
+                        {observacionesMetrics.cumplimiento ? (
+                          <ShieldCheck className="text-white" size={24} />
+                        ) : (
+                          <ShieldAlert className="text-white" size={24} />
+                        )}
                       </div>
-                      <div>
-                        <p className="text-soft-slate text-sm mb-1">Acumulado Actual</p>
-                        <p className="text-2xl font-bold text-vision-ink">{reportesMetrics.promedioReportes.toFixed(2)}%</p>
-                      </div>
-                      <div>
-                        <p className="text-soft-slate text-sm mb-1">Avance</p>
-                        <p className={`text-2xl font-bold ${reportesMetrics.cumplimiento ? 'text-emerald-600' : 'text-amber-600'}`}>
-                          {((reportesMetrics.promedioReportes / reportesMetrics.metaAnualReportes) * 100).toFixed(1)}%
+                      <div className="flex-1">
+                        <h4 className="text-vision-ink font-bold text-lg mb-2">
+                          {observacionesMetrics.cumplimiento ? 'Cumplimiento Exitoso' : 'Meta Excedida'}
+                        </h4>
+                        <p className="text-vision-ink/80 text-sm leading-relaxed">
+                          {observacionesMetrics.cumplimiento
+                            ? `Has mantenido las observaciones dentro de la meta anual (${observacionesMetrics.metaAnualObs}). ¡Excelente trabajo en el cumplimiento regulatorio!`
+                            : `Se han recibido ${observacionesMetrics.totalObservaciones} observaciones, superando la meta de ${observacionesMetrics.metaAnualObs}. Se requiere reforzar procesos de cumplimiento.`
+                          }
                         </p>
                       </div>
                     </div>
                   </div>
-                </div>
-              </div>
 
-              {/* Gráfica de progreso hacia meta */}
-              <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 border border-white/80 shadow-soft">
-                <h4 className="text-vision-ink font-medium text-sm mb-4">Progreso hacia Meta Anual</h4>
-                <div className="h-64 md:h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={reportesAccumulatedData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="gradient-progress" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#059669" stopOpacity={0.25} />
-                          <stop offset="95%" stopColor="#059669" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.3)" />
-                      <XAxis dataKey="mes" stroke="#64748b" fontSize={12} />
-                      <YAxis 
-                        stroke="#64748b" 
-                        fontSize={12} 
-                        tickFormatter={(v: number) => `${v}%`}
-                        domain={[0, 100]}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                          border: '1px solid rgba(148,163,184,0.3)',
-                          borderRadius: '12px',
-                          boxShadow: '0 8px 32px rgba(0,0,0,0.12)'
-                        }}
-                        labelStyle={{ color: '#0f172a', fontWeight: 'bold' }}
-                        formatter={(value: number, name: string) => {
-                          if (name === 'meta_anual') return [`${value?.toFixed(2) || '-'}%`, 'Meta Anual'];
-                          return [`${value?.toFixed(2) || '-'}%`, 'Acumulado'];
-                        }}
-                      />
-                      <Legend />
-                      <Area
-                        type="monotone"
-                        dataKey={`acumulado_${selectedYear}`}
-                        name="Acumulado"
-                        stroke="#059669"
-                        strokeWidth={3}
-                        fill="url(#gradient-progress)"
-                        dot={{ fill: '#059669', strokeWidth: 0, r: 4 }}
-                        activeDot={{ r: 6, strokeWidth: 2, stroke: '#fff' }}
-                        connectNulls
-                      />
-                      <ReferenceLine y={reportesMetrics.metaAnualReportes} stroke="#dc2626" strokeDasharray="5 5" strokeWidth={2} label={{ value: 'Meta', position: 'right', fill: '#dc2626' }} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Vista Overview para OBSERVACIONES */}
-          {observacionesView === 'overview' && selectedMetric === 'observaciones' && observacionesMetrics && (
-            <motion.div
-              key="overview-observaciones"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="space-y-4"
-            >
-              {/* Métricas principales */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                {/* Total Observaciones */}
-                <div className={`rounded-2xl p-4 border shadow-soft ${
-                  observacionesMetrics.totalObservaciones === 0 
-                    ? 'bg-gradient-to-br from-emerald-50 to-teal-50/50 border-emerald-100'
-                    : 'bg-gradient-to-br from-rose-50 to-red-50/50 border-rose-100'
-                }`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-soft-slate text-sm">Observaciones {selectedYear}</span>
-                    <div className={`p-1.5 rounded-lg ${
-                      observacionesMetrics.totalObservaciones === 0 ? 'bg-emerald-100' : 'bg-rose-100'
-                    }`}>
-                      {observacionesMetrics.totalObservaciones === 0 ? (
-                        <CheckCircle2 size={14} className="text-emerald-600" />
-                      ) : (
-                        <AlertTriangle size={14} className="text-rose-600" />
-                      )}
+                  {/* Gráfica de tendencia */}
+                  <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 border border-white/80 shadow-soft">
+                    <h4 className="text-vision-ink font-medium text-sm mb-4">Tendencia Mensual por Año</h4>
+                    <div className="h-64 md:h-80">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={observacionesChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                          <defs>
+                            {observacionesYears.map((year, idx) => (
+                              <linearGradient key={year} id={`gradient-obs-${year}`} x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor={yearColors[year]} stopOpacity={idx === 0 ? 0.25 : 0.08} />
+                                <stop offset="95%" stopColor={yearColors[year]} stopOpacity={0} />
+                              </linearGradient>
+                            ))}
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.3)" />
+                          <XAxis dataKey="mes" stroke="#64748b" fontSize={12} />
+                          <YAxis stroke="#64748b" fontSize={12} allowDecimals={false} />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                              border: '1px solid rgba(148,163,184,0.3)',
+                              borderRadius: '12px',
+                              boxShadow: '0 8px 32px rgba(0,0,0,0.12)'
+                            }}
+                            formatter={(value: number, name: string) => {
+                              const year = name.split('_')[1];
+                              return [value ?? '-', year];
+                            }}
+                          />
+                          <Legend 
+                            formatter={(value: string) => {
+                              const year = value.split('_')[1];
+                              return <span style={{ color: yearColors[Number(year)], fontWeight: 600 }}>{year}</span>;
+                            }}
+                          />
+                          {[...observacionesYears].sort((a, b) => a - b).map((year) => (
+                            <Area
+                              key={year}
+                              type="monotone"
+                              dataKey={`año_${year}`}
+                              stroke={yearColors[year]}
+                              strokeWidth={year === selectedYear ? 3 : 1.5}
+                              fill={`url(#gradient-obs-${year})`}
+                              dot={{ fill: yearColors[year], strokeWidth: 0, r: year === selectedYear ? 4 : 2 }}
+                              connectNulls
+                            />
+                          ))}
+                        </AreaChart>
+                      </ResponsiveContainer>
                     </div>
                   </div>
-                  <p className="text-3xl font-bold text-vision-ink mb-1">
-                    {observacionesMetrics.totalObservaciones}
-                  </p>
-                  <p className="text-xs text-soft-slate">
-                    Meta: {observacionesMetrics.metaAnualObs} observaciones
-                  </p>
-                </div>
 
-                {/* Meses con observaciones */}
-                <div className="bg-gradient-to-br from-amber-50 to-orange-50/50 rounded-2xl p-4 border border-amber-100 shadow-soft">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-soft-slate text-sm">Meses Afectados</span>
-                    <div className="p-1.5 rounded-lg bg-amber-100">
-                      <Calendar size={14} className="text-amber-600" />
-                    </div>
-                  </div>
-                  <p className="text-3xl font-bold text-vision-ink mb-1">
-                    {observacionesMetrics.mesesConObservaciones}
-                  </p>
-                  <p className="text-xs text-soft-slate">
-                    de {observacionesMetrics.totalMeses} meses registrados
-                  </p>
-                </div>
-
-                {/* Con descripción */}
-                <div className="bg-gradient-to-br from-blue-50 to-indigo-50/50 rounded-2xl p-4 border border-blue-100 shadow-soft">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-soft-slate text-sm">Con Descripción</span>
-                    <div className="p-1.5 rounded-lg bg-blue-100">
-                      <FileText size={14} className="text-blue-600" />
-                    </div>
-                  </div>
-                  <p className="text-3xl font-bold text-vision-ink mb-1">
-                    {observacionesMetrics.observacionesConDescripcion}
-                  </p>
-                  <p className="text-xs text-soft-slate">
-                    observaciones documentadas
-                  </p>
-                </div>
-
-                {/* Tendencia */}
-                <div className="bg-gradient-to-br from-violet-50 to-purple-50/50 rounded-2xl p-4 border border-violet-100 shadow-soft">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-soft-slate text-sm">Tendencia</span>
-                    <div className="p-1.5 rounded-lg bg-violet-100">
-                      <TrendingDown size={14} className="text-violet-600" />
-                    </div>
-                  </div>
-                  <p className={`text-3xl font-bold mb-1 ${
-                    observacionesMetrics.tendencia <= 0 ? 'text-emerald-600' : 'text-rose-600'
-                  }`}>
-                    {observacionesMetrics.tendencia > 0 ? '+' : ''}{observacionesMetrics.tendencia.toFixed(1)}%
-                  </p>
-                  <p className="text-xs text-soft-slate">
-                    {observacionesMetrics.tendencia <= 0 ? 'Mejorando' : 'Empeorando'}
-                  </p>
-                </div>
-              </div>
-
-              {/* Estado de cumplimiento */}
-              <div className={`rounded-2xl p-5 border ${
-                observacionesMetrics.cumplimiento
-                  ? 'bg-gradient-to-br from-emerald-50 to-teal-100/60 border-emerald-200'
-                  : 'bg-gradient-to-br from-rose-50 to-red-100/60 border-rose-200'
-              }`}>
-                <div className="flex items-start gap-4">
-                  <div className={`p-3 rounded-xl shadow-lg ${
-                    observacionesMetrics.cumplimiento
-                      ? 'bg-gradient-to-br from-emerald-500 to-teal-600'
-                      : 'bg-gradient-to-br from-rose-500 to-red-600'
-                  }`}>
-                    {observacionesMetrics.cumplimiento ? (
-                      <ShieldCheck className="text-white" size={24} />
-                    ) : (
-                      <ShieldAlert className="text-white" size={24} />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="text-vision-ink font-bold text-lg mb-2">
-                      {observacionesMetrics.cumplimiento ? 'Cumplimiento Exitoso' : 'Meta Excedida'}
+                  {/* Mini timeline */}
+                  <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 border border-white/80 shadow-soft">
+                    <h4 className="text-vision-ink font-medium text-sm mb-4 flex items-center gap-2">
+                      <Clock size={16} className="text-plasma-blue" />
+                      Observaciones por Mes
                     </h4>
-                    <p className="text-vision-ink/80 text-sm leading-relaxed">
-                      {observacionesMetrics.cumplimiento
-                        ? `Has mantenido las observaciones dentro de la meta anual (${observacionesMetrics.metaAnualObs}). ¡Excelente trabajo en el cumplimiento regulatorio!`
-                        : `Se han recibido ${observacionesMetrics.totalObservaciones} observaciones, superando la meta de ${observacionesMetrics.metaAnualObs}. Se requiere reforzar procesos de cumplimiento.`
-                      }
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Gráfica de tendencia */}
-              <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 border border-white/80 shadow-soft">
-                <h4 className="text-vision-ink font-medium text-sm mb-4">Tendencia Mensual por Año</h4>
-                <div className="h-64 md:h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={observacionesChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                      <defs>
-                        {observacionesYears.map((year: number, idx: number) => (
-                          <linearGradient key={year} id={`gradient-obs-${year}`} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={yearColors[year]} stopOpacity={idx === 0 ? 0.25 : 0.08} />
-                            <stop offset="95%" stopColor={yearColors[year]} stopOpacity={0} />
-                          </linearGradient>
-                        ))}
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.3)" />
-                      <XAxis dataKey="mes" stroke="#64748b" fontSize={12} />
-                      <YAxis 
-                        stroke="#64748b" 
-                        fontSize={12} 
-                        allowDecimals={false}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                          border: '1px solid rgba(148,163,184,0.3)',
-                          borderRadius: '12px',
-                          boxShadow: '0 8px 32px rgba(0,0,0,0.12)'
-                        }}
-                        labelStyle={{ color: '#0f172a', fontWeight: 'bold' }}
-                        formatter={(value: number, name: string) => {
-                          const year = name.split('_')[1];
-                          return [value ?? '-', year];
-                        }}
-                      />
-                      <Legend 
-                        formatter={(value: string) => {
-                          const year = value.split('_')[1];
-                          return <span style={{ color: yearColors[Number(year)], fontWeight: 600 }}>{year}</span>;
-                        }}
-                      />
-                      {[...observacionesYears].sort((a, b) => a - b).map((year: number) => (
-                        <Area
-                          key={year}
-                          type="monotone"
-                          dataKey={`año_${year}`}
-                          stroke={yearColors[year]}
-                          strokeWidth={year === selectedYear ? 3 : 1.5}
-                          fill={`url(#gradient-obs-${year})`}
-                          dot={{ fill: yearColors[year], strokeWidth: 0, r: year === selectedYear ? 4 : 2 }}
-                          activeDot={{ r: 6, strokeWidth: 2, stroke: '#fff' }}
-                          connectNulls
-                        />
-                      ))}
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Observaciones por mes (mini timeline) */}
-              <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 border border-white/80 shadow-soft">
-                <h4 className="text-vision-ink font-medium text-sm mb-4 flex items-center gap-2">
-                  <Clock size={16} className="text-plasma-blue" />
-                  Observaciones por Mes
-                </h4>
-                <div className="grid grid-cols-1 gap-2">
-                  {currentYearObservaciones.map((record) => {
-                    const hasObs = (record.observaciones_cnbv_condusef || 0) > 0;
-                    const hasDesc = record.descripcion_observaciones && record.descripcion_observaciones.trim().length > 0;
-                    
-                    return (
-                      <div
-                        key={`${record.anio}-${record.mes}`}
-                        className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
-                          hasObs
-                            ? 'bg-rose-50/80 border-rose-200'
-                            : 'bg-emerald-50/80 border-emerald-200'
-                        }`}
-                      >
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm ${
-                          hasObs ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
-                        }`}>
-                          {MONTH_NAMES[record.mes - 1]}
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-vision-ink font-medium text-sm">
-                            {record.observaciones_cnbv_condusef || 0} {record.observaciones_cnbv_condusef === 1 ? 'observación' : 'observaciones'}
-                          </p>
-                          {hasDesc && (
-                            <p className="text-soft-slate text-xs flex items-center gap-1 mt-0.5">
-                              <FileText size={12} />
-                              Con descripción detallada
-                            </p>
-                          )}
-                        </div>
-                        {hasObs ? (
-                          <AlertCircle className="text-rose-500 flex-shrink-0" size={18} />
-                        ) : (
-                          <CheckCircle2 className="text-emerald-500 flex-shrink-0" size={18} />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Vista Timeline para OBSERVACIONES */}
-          {observacionesView === 'timeline' && selectedMetric === 'observaciones' && (
-            <motion.div
-              key="timeline"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="space-y-4"
-            >
-              <div className="relative">
-                {/* Línea vertical */}
-                <div className="absolute left-[19px] top-0 bottom-0 w-0.5 bg-gradient-to-b from-slate-200 via-slate-300 to-slate-200" />
-                
-                {/* Items */}
-                <div className="space-y-6">
-                  {currentYearObservaciones.map((record, index) => {
-                    const hasObs = (record.observaciones_cnbv_condusef || 0) > 0;
-                    const hasDesc = record.descripcion_observaciones && record.descripcion_observaciones.trim().length > 0;
-                    
-                    return (
-                      <motion.div
-                        key={`${record.anio}-${record.mes}`}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.05 }}
-                        className="relative pl-12"
-                      >
-                        {/* Dot */}
-                        <div className={`absolute left-0 w-10 h-10 rounded-full flex items-center justify-center border-4 border-white shadow-lg ${
-                          hasObs 
-                            ? 'bg-gradient-to-br from-rose-400 to-red-500'
-                            : 'bg-gradient-to-br from-emerald-400 to-teal-500'
-                        }`}>
-                          {hasObs ? (
-                            <AlertTriangle className="text-white" size={18} />
-                          ) : (
-                            <CheckCircle2 className="text-white" size={18} />
-                          )}
-                        </div>
-
-                        {/* Content */}
-                        <div className={`glass-panel p-4 ${hasObs ? 'border-rose-200' : 'border-emerald-200'}`}>
-                          <div className="flex items-start justify-between mb-2">
-                            <div>
-                              <h5 className="text-vision-ink font-bold text-base">
-                                {FULL_MONTH_NAMES[record.mes - 1]} {record.anio}
-                              </h5>
-                              <p className="text-soft-slate text-sm mt-1">
+                    <div className="grid grid-cols-1 gap-2">
+                      {currentYearObservaciones.map((record) => {
+                        const hasObs = (record.observaciones_cnbv_condusef || 0) > 0;
+                        const hasDesc = record.descripcion_observaciones && record.descripcion_observaciones.trim().length > 0;
+                        
+                        return (
+                          <div
+                            key={`${record.anio}-${record.mes}`}
+                            className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                              hasObs
+                                ? 'bg-rose-50/80 border-rose-200'
+                                : 'bg-emerald-50/80 border-emerald-200'
+                            }`}
+                          >
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm ${
+                              hasObs ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
+                            }`}>
+                              {MONTH_NAMES[record.mes - 1]}
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-vision-ink font-medium text-sm">
                                 {record.observaciones_cnbv_condusef || 0} {record.observaciones_cnbv_condusef === 1 ? 'observación' : 'observaciones'}
                               </p>
-                            </div>
-                            <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-                              hasObs
-                                ? 'bg-rose-100 text-rose-700'
-                                : 'bg-emerald-100 text-emerald-700'
-                            }`}>
-                              {hasObs ? 'Con observaciones' : 'Sin observaciones'}
-                            </div>
-                          </div>
-
-                          {hasDesc && (
-                            <div className="mt-3 p-3 bg-slate-50/80 rounded-xl border border-slate-200">
-                              <p className="text-vision-ink/80 text-sm leading-relaxed whitespace-pre-wrap">
-                                {record.descripcion_observaciones}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </motion.div>
-                    );
-                  })}
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Vista Descripciones */}
-          {/* Vista Descripciones para OBSERVACIONES */}
-          {observacionesView === 'descriptions' && selectedMetric === 'observaciones' && (
-            <motion.div
-              key="descriptions"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="space-y-3"
-            >
-              {currentYearObservaciones.filter(r => r.descripcion_observaciones && r.descripcion_observaciones.trim().length > 0).length === 0 ? (
-                <div className="text-center py-12">
-                  <FileText size={48} className="text-slate-300 mx-auto mb-4" />
-                  <h4 className="text-soft-slate text-lg mb-2">Sin descripciones disponibles</h4>
-                  <p className="text-soft-slate/60 text-sm">
-                    No hay observaciones con descripción detallada para {selectedYear}.
-                  </p>
-                </div>
-              ) : (
-                currentYearObservaciones
-                  .filter(r => r.descripcion_observaciones && r.descripcion_observaciones.trim().length > 0)
-                  .map((record) => (
-                    <motion.div
-                      key={`${record.anio}-${record.mes}`}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                    >
-                      <button
-                        onClick={() => setExpandedMonth(expandedMonth === record.mes ? null : record.mes)}
-                        className="w-full text-left"
-                      >
-                        <div className="glass-panel p-4 hover:shadow-glass-hover transition-all duration-200 cursor-pointer">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3 flex-1">
-                              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-rose-400 to-red-500 flex items-center justify-center shadow-lg">
-                                <span className="text-white font-bold text-sm">
-                                  {MONTH_NAMES[record.mes - 1]}
-                                </span>
-                              </div>
-                              <div className="flex-1">
-                                <h5 className="text-vision-ink font-bold text-sm md:text-base">
-                                  {FULL_MONTH_NAMES[record.mes - 1]} {record.anio}
-                                </h5>
-                                <p className="text-soft-slate text-xs mt-0.5">
-                                  {record.observaciones_cnbv_condusef} {record.observaciones_cnbv_condusef === 1 ? 'observación' : 'observaciones'}
+                              {hasDesc && (
+                                <p className="text-soft-slate text-xs flex items-center gap-1 mt-0.5">
+                                  <FileText size={12} />
+                                  Con descripción detallada
                                 </p>
-                              </div>
+                              )}
                             </div>
-                            <div className="flex items-center gap-2">
-                              <Eye size={16} className="text-plasma-blue" />
-                              <ChevronDown
-                                size={18}
-                                className={`text-soft-slate transition-transform duration-200 ${
-                                  expandedMonth === record.mes ? 'rotate-180' : ''
-                                }`}
-                              />
-                            </div>
+                            {hasObs ? (
+                              <AlertCircle className="text-rose-500 flex-shrink-0" size={18} />
+                            ) : (
+                              <CheckCircle2 className="text-emerald-500 flex-shrink-0" size={18} />
+                            )}
                           </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
 
-                          <AnimatePresence>
-                            {expandedMonth === record.mes && (
-                              <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: 'auto' }}
-                                exit={{ opacity: 0, height: 0 }}
-                                transition={{ duration: 0.2 }}
-                                className="overflow-hidden"
-                              >
-                                <div className="mt-4 pt-4 border-t border-slate-200">
-                                  <div className="p-4 bg-gradient-to-br from-slate-50 to-slate-100/50 rounded-xl border border-slate-200">
-                                    <h6 className="text-vision-ink font-semibold text-sm mb-3 flex items-center gap-2">
-                                      <FileText size={14} className="text-plasma-blue" />
-                                      Descripción Detallada
-                                    </h6>
-                                    <p className="text-vision-ink/80 text-sm leading-relaxed whitespace-pre-wrap">
-                                      {record.descripcion_observaciones}
+              {/* Vista Timeline */}
+              {observacionesView === 'timeline' && (
+                <motion.div
+                  key="timeline"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  className="space-y-4"
+                >
+                  <div className="relative">
+                    <div className="absolute left-[19px] top-0 bottom-0 w-0.5 bg-gradient-to-b from-slate-200 via-slate-300 to-slate-200" />
+                    <div className="space-y-6">
+                      {currentYearObservaciones.map((record, index) => {
+                        const hasObs = (record.observaciones_cnbv_condusef || 0) > 0;
+                        const hasDesc = record.descripcion_observaciones && record.descripcion_observaciones.trim().length > 0;
+                        
+                        return (
+                          <motion.div
+                            key={`${record.anio}-${record.mes}`}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: index * 0.05 }}
+                            className="relative pl-12"
+                          >
+                            <div className={`absolute left-0 w-10 h-10 rounded-full flex items-center justify-center border-4 border-white shadow-lg ${
+                              hasObs 
+                                ? 'bg-gradient-to-br from-rose-400 to-red-500'
+                                : 'bg-gradient-to-br from-emerald-400 to-teal-500'
+                            }`}>
+                              {hasObs ? (
+                                <AlertTriangle className="text-white" size={18} />
+                              ) : (
+                                <CheckCircle2 className="text-white" size={18} />
+                              )}
+                            </div>
+
+                            <div className={`glass-panel p-4 ${hasObs ? 'border-rose-200' : 'border-emerald-200'}`}>
+                              <div className="flex items-start justify-between mb-2">
+                                <div>
+                                  <h5 className="text-vision-ink font-bold text-base">
+                                    {FULL_MONTH_NAMES[record.mes - 1]} {record.anio}
+                                  </h5>
+                                  <p className="text-soft-slate text-sm mt-1">
+                                    {record.observaciones_cnbv_condusef || 0} {record.observaciones_cnbv_condusef === 1 ? 'observación' : 'observaciones'}
+                                  </p>
+                                </div>
+                                <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                  hasObs
+                                    ? 'bg-rose-100 text-rose-700'
+                                    : 'bg-emerald-100 text-emerald-700'
+                                }`}>
+                                  {hasObs ? 'Con observaciones' : 'Sin observaciones'}
+                                </div>
+                              </div>
+
+                              {hasDesc && (
+                                <div className="mt-3 p-3 bg-slate-50/80 rounded-xl border border-slate-200">
+                                  <p className="text-vision-ink/80 text-sm leading-relaxed whitespace-pre-wrap">
+                                    {record.descripcion_observaciones}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Vista Descripciones */}
+              {observacionesView === 'descriptions' && (
+                <motion.div
+                  key="descriptions"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  className="space-y-3"
+                >
+                  {currentYearObservaciones.filter(r => r.descripcion_observaciones && r.descripcion_observaciones.trim().length > 0).length === 0 ? (
+                    <div className="text-center py-12">
+                      <FileText size={48} className="text-slate-300 mx-auto mb-4" />
+                      <h4 className="text-soft-slate text-lg mb-2">Sin descripciones disponibles</h4>
+                      <p className="text-soft-slate/60 text-sm">
+                        No hay observaciones con descripción detallada para {selectedYear}.
+                      </p>
+                    </div>
+                  ) : (
+                    currentYearObservaciones
+                      .filter(r => r.descripcion_observaciones && r.descripcion_observaciones.trim().length > 0)
+                      .map((record) => (
+                        <motion.div
+                          key={`${record.anio}-${record.mes}`}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                        >
+                          <button
+                            onClick={() => setExpandedMonth(expandedMonth === record.mes ? null : record.mes)}
+                            className="w-full text-left"
+                          >
+                            <div className="glass-panel p-4 hover:shadow-glass-hover transition-all duration-200 cursor-pointer">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3 flex-1">
+                                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-rose-400 to-red-500 flex items-center justify-center shadow-lg">
+                                    <span className="text-white font-bold text-sm">
+                                      {MONTH_NAMES[record.mes - 1]}
+                                    </span>
+                                  </div>
+                                  <div className="flex-1">
+                                    <h5 className="text-vision-ink font-bold text-sm md:text-base">
+                                      {FULL_MONTH_NAMES[record.mes - 1]} {record.anio}
+                                    </h5>
+                                    <p className="text-soft-slate text-xs mt-0.5">
+                                      {record.observaciones_cnbv_condusef} {record.observaciones_cnbv_condusef === 1 ? 'observación' : 'observaciones'}
                                     </p>
                                   </div>
                                 </div>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </div>
-                      </button>
-                    </motion.div>
-                  ))
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+                                <div className="flex items-center gap-2">
+                                  <Eye size={16} className="text-plasma-blue" />
+                                  <ChevronDown
+                                    size={18}
+                                    className={`text-soft-slate transition-transform duration-200 ${
+                                      expandedMonth === record.mes ? 'rotate-180' : ''
+                                    }`}
+                                  />
+                                </div>
+                              </div>
 
-        {/* Estado vacío */}
-        {((selectedMetric === 'reportes' && !reportesMetrics && reportesView === 'overview') || 
-          (selectedMetric === 'observaciones' && !observacionesMetrics && observacionesView === 'overview')) && (
-          <div className="text-center py-12">
-            <Shield size={48} className="text-slate-300 mx-auto mb-4" />
-            <h4 className="text-soft-slate text-lg mb-2">Sin datos disponibles</h4>
-            <p className="text-soft-slate/60 text-sm">
-              No hay registros de {selectedMetric === 'reportes' ? 'reportes' : 'observaciones'} para {selectedYear}.
-            </p>
-          </div>
-        )}
-      </div>
-    </motion.div>
+                              <AnimatePresence>
+                                {expandedMonth === record.mes && (
+                                  <motion.div
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: 'auto' }}
+                                    exit={{ opacity: 0, height: 0 }}
+                                    transition={{ duration: 0.2 }}
+                                    className="overflow-hidden"
+                                  >
+                                    <div className="mt-4 pt-4 border-t border-slate-200">
+                                      <div className="p-4 bg-gradient-to-br from-slate-50 to-slate-100/50 rounded-xl border border-slate-200">
+                                        <h6 className="text-vision-ink font-semibold text-sm mb-3 flex items-center gap-2">
+                                          <FileText size={14} className="text-plasma-blue" />
+                                          Descripción Detallada
+                                        </h6>
+                                        <p className="text-vision-ink/80 text-sm leading-relaxed whitespace-pre-wrap">
+                                          {record.descripcion_observaciones}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
+                          </button>
+                        </motion.div>
+                      ))
+                  )}
+                </motion.div>
+              )}
+
+              {/* Estado vacío */}
+              {!observacionesMetrics && observacionesView === 'overview' && (
+                <div className="text-center py-12">
+                  <Shield size={48} className="text-slate-300 mx-auto mb-4" />
+                  <h4 className="text-soft-slate text-lg mb-2">Sin datos disponibles</h4>
+                  <p className="text-soft-slate/60 text-sm">
+                    No hay registros de observaciones para {selectedYear}.
+                  </p>
+                </div>
+              )}
+            </AnimatePresence>
+          )}
+        </div>
+      </motion.div>
+    </div>
   );
 }
 
