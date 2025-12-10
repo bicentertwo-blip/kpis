@@ -224,27 +224,16 @@ export function RegulatoryComplianceAnalysisPanel({
   );
 
   // Si está seleccionado REPORTES, usar KpiAnalysisPanel genérico
-  // pero necesitamos inyectar el selector de métrica
+  // El selector de métrica se inyecta DENTRO del header existente del KpiAnalysisPanel
   if (selectedMetric === 'reportes') {
     return (
-      <div className="space-y-0">
-        {/* Header con selector de métrica que se integra visualmente */}
-        <div className="bg-white/70 backdrop-blur-xl rounded-t-2xl border border-b-0 border-white/80 p-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-gradient-to-br from-plasma-blue to-plasma-indigo shadow-lg">
-              <BarChart2 className="text-white" size={20} />
-            </div>
-            <div>
-              <h3 className="text-vision-ink font-semibold text-base md:text-lg">Panel de Análisis</h3>
-              <p className="text-soft-slate text-xs md:text-sm">Reportes a Tiempo (%)</p>
-            </div>
-          </div>
+      <div className="relative">
+        {/* KpiAnalysisPanel con su header nativo */}
+        <KpiAnalysisPanel config={reportesOnlyConfig} filters={filters} />
+        
+        {/* Selector de métrica inyectado en posición absoluta sobre el header */}
+        <div className="absolute top-4 md:top-5 right-[140px] md:right-[160px] z-50">
           <MetricSelector />
-        </div>
-
-        {/* Panel de Análisis Genérico para Reportes - sin su propio header */}
-        <div className="[&>div]:rounded-t-none [&>div]:border-t-0">
-          <KpiAnalysisPanel config={reportesOnlyConfig} filters={filters} />
         </div>
       </div>
     );
