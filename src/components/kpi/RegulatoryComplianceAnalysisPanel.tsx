@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar, ReferenceLine } from 'recharts';
 import { 
   Shield,
   ShieldAlert,
@@ -16,7 +16,8 @@ import {
   Eye,
   AlertCircle,
   Activity,
-  BarChart2
+  BarChart2,
+  Target
 } from 'lucide-react';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -48,11 +49,16 @@ type ReportesRecord = {
 };
 
 type MetricType = 'reportes' | 'observaciones';
+type ReportesView = 'overview' | 'monthly' | 'accumulated' | 'annual';
+type ObservacionesView = 'overview' | 'timeline' | 'descriptions';
 
 export function RegulatoryComplianceAnalysisPanel({
   filters: initialFilters
 }: RegulatoryComplianceAnalysisPanelProps) {
-  const [activeView, setActiveView] = useState<'overview' | 'timeline' | 'descriptions'>('overview');
+  // Vistas separadas por tipo de métrica
+  const [reportesView, setReportesView] = useState<ReportesView>('overview');
+  const [observacionesView, setObservacionesView] = useState<ObservacionesView>('overview');
+  
   const [observacionesData, setObservacionesData] = useState<ObservacionRecord[]>([]);
   const [reportesData, setReportesData] = useState<ReportesRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,13 +70,6 @@ export function RegulatoryComplianceAnalysisPanel({
   
   const yearDropdownRef = useRef<HTMLDivElement>(null);
   const metricDropdownRef = useRef<HTMLDivElement>(null);
-
-  // Resetear vista a overview cuando se cambia a Reportes (no tiene otras vistas)
-  useEffect(() => {
-    if (selectedMetric === 'reportes' && activeView !== 'overview') {
-      setActiveView('overview');
-    }
-  }, [selectedMetric, activeView]);
 
   // Cerrar dropdowns al hacer click fuera
   useEffect(() => {
@@ -263,6 +262,94 @@ export function RegulatoryComplianceAnalysisPanel({
     };
   }, [currentYearReportes, reportesData, selectedYear]);
 
+  // Datos para gráfica mensual de Reportes (con meta)
+  const reportesMonthlyData = useMemo(() => {
+    return MONTH_NAMES.map((mes, index) => {
+      const monthNum = index + 1;
+      const point: Record<string, string | number | null> = { mes };
+      
+      reportesYears.forEach(year => {
+        const record = reportesData.find(r => r.anio === year && r.mes === monthNum);
+        point[`valor_${year}`] = record ? record.reportes_a_tiempo : null;
+      });
+      
+      // Meta mensual del año seleccionado
+      const selectedRecord = reportesData.find(r => r.anio === selectedYear && r.mes === monthNum);
+      point['meta'] = selectedRecord?.meta ?? null;
+      
+      return point;
+    });
+  }, [reportesYears, reportesData, selectedYear]);
+
+  // Datos acumulados para Reportes (promedio porque es porcentaje)
+  const reportesAccumulatedData = useMemo(() => {
+    return MONTH_NAMES.map((mes, index) => {
+      const monthNum = index + 1;
+      const point: Record<string, string | number | null> = { mes };
+      
+      reportesYears.forEach(year => {
+        const yearData = reportesData.filter(r => r.anio === year && r.mes <= monthNum);
+        if (yearData.length > 0) {
+          const avg = yearData.reduce((sum, r) => sum + (r.reportes_a_tiempo || 0), 0) / yearData.length;
+          point[`acumulado_${year}`] = avg;
+        } else {
+          point[`acumulado_${year}`] = null;
+        }
+      });
+      
+      // Meta anual como línea de referencia
+      const metaAnual = currentYearReportes[0]?.meta_anual || null;
+      point['meta_anual'] = metaAnual;
+      
+      return point;
+    });
+  }, [reportesYears, reportesData, currentYearReportes]);
+
+  // Comparativas mensuales para Reportes
+  const reportesMonthlyComparison = useMemo(() => {
+    if (!reportesMetrics) return null;
+    const currentMonth = reportesMetrics.ultimoMes;
+    const currentValue = reportesMetrics.ultimoValor;
+    
+    const comparisons: { year: number; value: number; change: number }[] = [];
+    
+    reportesYears.filter(y => y !== selectedYear).forEach(year => {
+      const record = reportesData.find(r => r.anio === year && r.mes === currentMonth);
+      if (record) {
+        comparisons.push({
+          year,
+          value: record.reportes_a_tiempo,
+          change: currentValue - record.reportes_a_tiempo
+        });
+      }
+    });
+    
+    return comparisons;
+  }, [reportesMetrics, reportesYears, reportesData, selectedYear]);
+
+  // Comparativas acumuladas para Reportes
+  const reportesAccumulatedComparison = useMemo(() => {
+    if (!reportesMetrics) return null;
+    const currentMonth = reportesMetrics.ultimoMes;
+    const currentAccum = reportesMetrics.promedioReportes;
+    
+    const comparisons: { year: number; value: number; change: number }[] = [];
+    
+    reportesYears.filter(y => y !== selectedYear).forEach(year => {
+      const yearData = reportesData.filter(r => r.anio === year && r.mes <= currentMonth);
+      if (yearData.length > 0) {
+        const avg = yearData.reduce((sum, r) => sum + (r.reportes_a_tiempo || 0), 0) / yearData.length;
+        comparisons.push({
+          year,
+          value: avg,
+          change: currentAccum - avg
+        });
+      }
+    });
+    
+    return comparisons;
+  }, [reportesMetrics, reportesYears, reportesData, selectedYear]);
+
   // Vista de loading
   if (loading) {
     return (
@@ -391,7 +478,31 @@ export function RegulatoryComplianceAnalysisPanel({
           </div>
         </div>
 
-        {/* Tabs de vista - Solo mostrar todas las vistas para Observaciones */}
+        {/* Tabs de vista para REPORTES - Formato estándar */}
+        {selectedMetric === 'reportes' && (
+          <div className="flex flex-wrap gap-1.5">
+            {[
+              { id: 'overview', label: 'Resumen', icon: Activity },
+              { id: 'monthly', label: 'Mensual', icon: Calendar },
+              { id: 'accumulated', label: 'Acumulado', icon: TrendingUp },
+              { id: 'annual', label: 'Meta Anual', icon: Target }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setReportesView(tab.id as ReportesView)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200
+                          ${reportesView === tab.id 
+                            ? 'bg-plasma-blue text-white shadow-md shadow-plasma-blue/25' 
+                            : 'text-soft-slate hover:text-vision-ink hover:bg-slate-100'}`}
+              >
+                <tab.icon size={14} />
+                <span className="hidden sm:inline">{tab.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Tabs de vista para OBSERVACIONES - Formato especial */}
         {selectedMetric === 'observaciones' && (
           <div className="flex flex-wrap gap-1.5">
             {[
@@ -401,9 +512,9 @@ export function RegulatoryComplianceAnalysisPanel({
             ].map(tab => (
               <button
                 key={tab.id}
-                onClick={() => setActiveView(tab.id as typeof activeView)}
+                onClick={() => setObservacionesView(tab.id as ObservacionesView)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200
-                          ${activeView === tab.id 
+                          ${observacionesView === tab.id 
                             ? 'bg-plasma-blue text-white shadow-md shadow-plasma-blue/25' 
                             : 'text-soft-slate hover:text-vision-ink hover:bg-slate-100'}`}
               >
@@ -419,7 +530,7 @@ export function RegulatoryComplianceAnalysisPanel({
       <div className="p-4 md:p-5">
         <AnimatePresence mode="wait">
           {/* Vista Overview para REPORTES */}
-          {activeView === 'overview' && selectedMetric === 'reportes' && reportesMetrics && (
+          {reportesView === 'overview' && selectedMetric === 'reportes' && reportesMetrics && (
             <motion.div
               key="overview-reportes"
               initial={{ opacity: 0, x: -20 }}
@@ -478,6 +589,47 @@ export function RegulatoryComplianceAnalysisPanel({
                     <span className="text-soft-slate text-xs">Meta:</span>
                     <span className="text-vision-ink/80 text-sm font-medium">{reportesMetrics.metaAnualReportes}%</span>
                   </div>
+                </div>
+              </div>
+
+              {/* Comparativas */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* Comparativa Mensual */}
+                <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 border border-white/80 shadow-soft">
+                  <h4 className="text-soft-slate text-sm mb-3">Comparativa Mensual ({FULL_MONTH_NAMES[reportesMetrics.ultimoMes - 1]})</h4>
+                  {reportesMonthlyComparison && reportesMonthlyComparison.length > 0 ? (
+                    <div className="space-y-2">
+                      {reportesMonthlyComparison.map(comp => (
+                        <div key={comp.year} className="flex items-center justify-between">
+                          <span className="text-vision-ink text-sm">{comp.year}: {comp.value.toFixed(2)}%</span>
+                          <span className={`text-sm font-medium ${comp.change >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
+                            {comp.change >= 0 ? '+' : ''}{comp.change.toFixed(2)}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-soft-slate/60 text-sm">Sin datos de años anteriores</p>
+                  )}
+                </div>
+
+                {/* Comparativa Acumulada */}
+                <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 border border-white/80 shadow-soft">
+                  <h4 className="text-soft-slate text-sm mb-3">Comparativa Acumulado</h4>
+                  {reportesAccumulatedComparison && reportesAccumulatedComparison.length > 0 ? (
+                    <div className="space-y-2">
+                      {reportesAccumulatedComparison.map(comp => (
+                        <div key={comp.year} className="flex items-center justify-between">
+                          <span className="text-vision-ink text-sm">{comp.year}: {comp.value.toFixed(2)}%</span>
+                          <span className={`text-sm font-medium ${comp.change >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
+                            {comp.change >= 0 ? '+' : ''}{comp.change.toFixed(2)}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-soft-slate/60 text-sm">Sin datos de años anteriores</p>
+                  )}
                 </div>
               </div>
 
@@ -542,8 +694,240 @@ export function RegulatoryComplianceAnalysisPanel({
             </motion.div>
           )}
 
+          {/* Vista MENSUAL para REPORTES */}
+          {reportesView === 'monthly' && selectedMetric === 'reportes' && reportesMetrics && (
+            <motion.div
+              key="monthly-reportes"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="space-y-4"
+            >
+              <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 border border-white/80 shadow-soft">
+                <h4 className="text-vision-ink font-medium text-sm mb-4">Comparativa Mensual por Año</h4>
+                <div className="h-72 md:h-96">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={reportesMonthlyData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.3)" />
+                      <XAxis dataKey="mes" stroke="#64748b" fontSize={12} />
+                      <YAxis 
+                        stroke="#64748b" 
+                        fontSize={12} 
+                        tickFormatter={(v: number) => `${v}%`}
+                        domain={[0, 100]}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                          border: '1px solid rgba(148,163,184,0.3)',
+                          borderRadius: '12px',
+                          boxShadow: '0 8px 32px rgba(0,0,0,0.12)'
+                        }}
+                        labelStyle={{ color: '#0f172a', fontWeight: 'bold' }}
+                        formatter={(value: number, name: string) => {
+                          if (name === 'meta') return [`${value?.toFixed(2) || '-'}%`, 'Meta'];
+                          const year = name.split('_')[1];
+                          return [`${value?.toFixed(2) || '-'}%`, year];
+                        }}
+                      />
+                      <Legend 
+                        formatter={(value: string) => {
+                          if (value === 'meta') return <span style={{ color: '#dc2626', fontWeight: 600 }}>Meta</span>;
+                          const year = value.split('_')[1];
+                          return <span style={{ color: yearColors[Number(year)], fontWeight: 600 }}>{year}</span>;
+                        }}
+                      />
+                      {[...reportesYears].sort((a, b) => a - b).map((year: number) => (
+                        <Bar
+                          key={year}
+                          dataKey={`valor_${year}`}
+                          fill={yearColors[year]}
+                          radius={[4, 4, 0, 0]}
+                          opacity={year === selectedYear ? 1 : 0.6}
+                        />
+                      ))}
+                      <ReferenceLine y={reportesMetrics.metaReportes} stroke="#dc2626" strokeDasharray="5 5" strokeWidth={2} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Vista ACUMULADO para REPORTES */}
+          {reportesView === 'accumulated' && selectedMetric === 'reportes' && reportesMetrics && (
+            <motion.div
+              key="accumulated-reportes"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="space-y-4"
+            >
+              <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 border border-white/80 shadow-soft">
+                <h4 className="text-vision-ink font-medium text-sm mb-4">Acumulado (Promedio) por Año</h4>
+                <div className="h-72 md:h-96">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={reportesAccumulatedData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <defs>
+                        {reportesYears.map((year: number, idx: number) => (
+                          <linearGradient key={year} id={`gradient-acc-${year}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor={yearColors[year]} stopOpacity={idx === 0 ? 0.25 : 0.08} />
+                            <stop offset="95%" stopColor={yearColors[year]} stopOpacity={0} />
+                          </linearGradient>
+                        ))}
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.3)" />
+                      <XAxis dataKey="mes" stroke="#64748b" fontSize={12} />
+                      <YAxis 
+                        stroke="#64748b" 
+                        fontSize={12} 
+                        tickFormatter={(v: number) => `${v}%`}
+                        domain={[0, 100]}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                          border: '1px solid rgba(148,163,184,0.3)',
+                          borderRadius: '12px',
+                          boxShadow: '0 8px 32px rgba(0,0,0,0.12)'
+                        }}
+                        labelStyle={{ color: '#0f172a', fontWeight: 'bold' }}
+                        formatter={(value: number, name: string) => {
+                          if (name === 'meta_anual') return [`${value?.toFixed(2) || '-'}%`, 'Meta Anual'];
+                          const year = name.split('_')[1];
+                          return [`${value?.toFixed(2) || '-'}%`, year];
+                        }}
+                      />
+                      <Legend 
+                        formatter={(value: string) => {
+                          if (value === 'meta_anual') return <span style={{ color: '#dc2626', fontWeight: 600 }}>Meta Anual</span>;
+                          const year = value.split('_')[1];
+                          return <span style={{ color: yearColors[Number(year)], fontWeight: 600 }}>{year}</span>;
+                        }}
+                      />
+                      {[...reportesYears].sort((a, b) => a - b).map((year: number) => (
+                        <Area
+                          key={year}
+                          type="monotone"
+                          dataKey={`acumulado_${year}`}
+                          stroke={yearColors[year]}
+                          strokeWidth={year === selectedYear ? 3 : 1.5}
+                          fill={`url(#gradient-acc-${year})`}
+                          dot={{ fill: yearColors[year], strokeWidth: 0, r: year === selectedYear ? 4 : 2 }}
+                          activeDot={{ r: 6, strokeWidth: 2, stroke: '#fff' }}
+                          connectNulls
+                        />
+                      ))}
+                      <ReferenceLine y={reportesMetrics.metaAnualReportes} stroke="#dc2626" strokeDasharray="5 5" strokeWidth={2} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Vista META ANUAL para REPORTES */}
+          {reportesView === 'annual' && selectedMetric === 'reportes' && reportesMetrics && (
+            <motion.div
+              key="annual-reportes"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="space-y-4"
+            >
+              {/* Tarjeta de meta anual */}
+              <div className={`rounded-2xl p-6 border shadow-soft ${
+                reportesMetrics.cumplimiento
+                  ? 'bg-gradient-to-br from-emerald-50 to-teal-100/60 border-emerald-200'
+                  : 'bg-gradient-to-br from-amber-50 to-orange-100/60 border-amber-200'
+              }`}>
+                <div className="flex items-start gap-4">
+                  <div className={`p-3 rounded-xl shadow-lg ${
+                    reportesMetrics.cumplimiento
+                      ? 'bg-gradient-to-br from-emerald-500 to-teal-600'
+                      : 'bg-gradient-to-br from-amber-500 to-orange-600'
+                  }`}>
+                    <Target className="text-white" size={24} />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-vision-ink font-bold text-lg mb-2">
+                      {reportesMetrics.cumplimiento ? 'Cumpliendo Meta Anual' : 'Por Debajo de Meta Anual'}
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                      <div>
+                        <p className="text-soft-slate text-sm mb-1">Meta Anual</p>
+                        <p className="text-2xl font-bold text-vision-ink">{reportesMetrics.metaAnualReportes}%</p>
+                      </div>
+                      <div>
+                        <p className="text-soft-slate text-sm mb-1">Acumulado Actual</p>
+                        <p className="text-2xl font-bold text-vision-ink">{reportesMetrics.promedioReportes.toFixed(2)}%</p>
+                      </div>
+                      <div>
+                        <p className="text-soft-slate text-sm mb-1">Avance</p>
+                        <p className={`text-2xl font-bold ${reportesMetrics.cumplimiento ? 'text-emerald-600' : 'text-amber-600'}`}>
+                          {((reportesMetrics.promedioReportes / reportesMetrics.metaAnualReportes) * 100).toFixed(1)}%
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Gráfica de progreso hacia meta */}
+              <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 border border-white/80 shadow-soft">
+                <h4 className="text-vision-ink font-medium text-sm mb-4">Progreso hacia Meta Anual</h4>
+                <div className="h-64 md:h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={reportesAccumulatedData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="gradient-progress" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#059669" stopOpacity={0.25} />
+                          <stop offset="95%" stopColor="#059669" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.3)" />
+                      <XAxis dataKey="mes" stroke="#64748b" fontSize={12} />
+                      <YAxis 
+                        stroke="#64748b" 
+                        fontSize={12} 
+                        tickFormatter={(v: number) => `${v}%`}
+                        domain={[0, 100]}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                          border: '1px solid rgba(148,163,184,0.3)',
+                          borderRadius: '12px',
+                          boxShadow: '0 8px 32px rgba(0,0,0,0.12)'
+                        }}
+                        labelStyle={{ color: '#0f172a', fontWeight: 'bold' }}
+                        formatter={(value: number, name: string) => {
+                          if (name === 'meta_anual') return [`${value?.toFixed(2) || '-'}%`, 'Meta Anual'];
+                          return [`${value?.toFixed(2) || '-'}%`, 'Acumulado'];
+                        }}
+                      />
+                      <Legend />
+                      <Area
+                        type="monotone"
+                        dataKey={`acumulado_${selectedYear}`}
+                        name="Acumulado"
+                        stroke="#059669"
+                        strokeWidth={3}
+                        fill="url(#gradient-progress)"
+                        dot={{ fill: '#059669', strokeWidth: 0, r: 4 }}
+                        activeDot={{ r: 6, strokeWidth: 2, stroke: '#fff' }}
+                        connectNulls
+                      />
+                      <ReferenceLine y={reportesMetrics.metaAnualReportes} stroke="#dc2626" strokeDasharray="5 5" strokeWidth={2} label={{ value: 'Meta', position: 'right', fill: '#dc2626' }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {/* Vista Overview para OBSERVACIONES */}
-          {activeView === 'overview' && selectedMetric === 'observaciones' && observacionesMetrics && (
+          {observacionesView === 'overview' && selectedMetric === 'observaciones' && observacionesMetrics && (
             <motion.div
               key="overview-observaciones"
               initial={{ opacity: 0, x: -20 }}
@@ -769,8 +1153,8 @@ export function RegulatoryComplianceAnalysisPanel({
             </motion.div>
           )}
 
-          {/* Vista Timeline */}
-          {activeView === 'timeline' && (
+          {/* Vista Timeline para OBSERVACIONES */}
+          {observacionesView === 'timeline' && selectedMetric === 'observaciones' && (
             <motion.div
               key="timeline"
               initial={{ opacity: 0, x: -20 }}
@@ -846,7 +1230,8 @@ export function RegulatoryComplianceAnalysisPanel({
           )}
 
           {/* Vista Descripciones */}
-          {activeView === 'descriptions' && (
+          {/* Vista Descripciones para OBSERVACIONES */}
+          {observacionesView === 'descriptions' && selectedMetric === 'observaciones' && (
             <motion.div
               key="descriptions"
               initial={{ opacity: 0, x: -20 }}
@@ -936,8 +1321,8 @@ export function RegulatoryComplianceAnalysisPanel({
         </AnimatePresence>
 
         {/* Estado vacío */}
-        {((selectedMetric === 'reportes' && !reportesMetrics) || 
-          (selectedMetric === 'observaciones' && !observacionesMetrics)) && activeView === 'overview' && (
+        {((selectedMetric === 'reportes' && !reportesMetrics && reportesView === 'overview') || 
+          (selectedMetric === 'observaciones' && !observacionesMetrics && observacionesView === 'overview')) && (
           <div className="text-center py-12">
             <Shield size={48} className="text-slate-300 mx-auto mb-4" />
             <h4 className="text-soft-slate text-lg mb-2">Sin datos disponibles</h4>
