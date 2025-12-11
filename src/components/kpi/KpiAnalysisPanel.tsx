@@ -23,6 +23,7 @@ import { KpiValidationPanel } from './KpiValidationPanel';
 import { InsightsPanel } from './InsightsPanel';
 import { ExpandableDataTable } from './ExpandableDataTable';
 import { ProjectionTable } from './ProjectionTable';
+import { CarteraCrecimientoAnalysisPanel } from './CarteraCrecimientoAnalysisPanel';
 
 interface KpiAnalysisPanelProps {
   config: KpiDefinition;
@@ -731,6 +732,13 @@ export function KpiAnalysisPanel({
         </div>
       </div>
 
+      {/* Panel especializado para Crecimiento de Cartera */}
+      {selectedSummary?.id === 'resumen-crecimiento' ? (
+        <div className="p-4 md:p-5">
+          <CarteraCrecimientoAnalysisPanel filters={initialFilters} />
+        </div>
+      ) : (
+      <>
       {/* Contenido principal */}
       <div className="p-4 md:p-5">
         <AnimatePresence mode="wait">
@@ -1241,6 +1249,8 @@ export function KpiAnalysisPanel({
           </div>
         )}
       </div>
+      </>
+      )}
     </motion.div>
   </>
   );
