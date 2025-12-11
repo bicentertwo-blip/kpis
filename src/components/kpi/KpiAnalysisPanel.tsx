@@ -595,6 +595,18 @@ export function KpiAnalysisPanel({
     );
   }
 
+  // Panel especializado para Crecimiento de Cartera - reemplaza completamente el panel estándar
+  if (selectedSummary?.id === 'resumen-crecimiento') {
+    return (
+      <CarteraCrecimientoAnalysisPanel 
+        config={config}
+        filters={initialFilters}
+        selectedSummaryIndex={selectedSummaryIndex}
+        onSummaryChange={setSelectedSummaryIndex}
+      />
+    );
+  }
+
   return (
     <>
     <motion.div
@@ -732,13 +744,6 @@ export function KpiAnalysisPanel({
         </div>
       </div>
 
-      {/* Panel especializado para Crecimiento de Cartera */}
-      {selectedSummary?.id === 'resumen-crecimiento' ? (
-        <div className="p-4 md:p-5">
-          <CarteraCrecimientoAnalysisPanel filters={initialFilters} />
-        </div>
-      ) : (
-      <>
       {/* Contenido principal */}
       <div className="p-4 md:p-5">
         <AnimatePresence mode="wait">
@@ -1249,8 +1254,6 @@ export function KpiAnalysisPanel({
           </div>
         )}
       </div>
-      </>
-      )}
     </motion.div>
   </>
   );

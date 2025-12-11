@@ -31,13 +31,18 @@ import {
   Wallet,
   ArrowUpRight,
   ArrowDownRight,
-  BarChart2
+  BarChart2,
+  Layers
 } from 'lucide-react';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import type { KpiDefinition } from '@/types/kpi-definitions';
 
 interface CarteraCrecimientoAnalysisPanelProps {
+  config: KpiDefinition;
   filters: { anio: number; mes: number };
+  selectedSummaryIndex: number;
+  onSummaryChange: (index: number) => void;
 }
 
 const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -56,21 +61,29 @@ type CrecimientoRecord = {
 type ViewType = 'overview' | 'saldos' | 'crecimiento' | 'meta';
 
 export function CarteraCrecimientoAnalysisPanel({
-  filters
+  config,
+  filters,
+  selectedSummaryIndex,
+  onSummaryChange
 }: CarteraCrecimientoAnalysisPanelProps) {
   const [activeView, setActiveView] = useState<ViewType>('overview');
   const [data, setData] = useState<CrecimientoRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState<number>(filters.anio);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isSummaryDropdownOpen, setIsSummaryDropdownOpen] = useState(false);
   
   const yearDropdownRef = useRef<HTMLDivElement>(null);
+  const summaryDropdownRef = useRef<HTMLDivElement>(null);
 
   // Cerrar dropdown al hacer click fuera
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (yearDropdownRef.current && !yearDropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
+      }
+      if (summaryDropdownRef.current && !summaryDropdownRef.current.contains(event.target as Node)) {
+        setIsSummaryDropdownOpen(false);
       }
     };
     
@@ -269,59 +282,106 @@ export function CarteraCrecimientoAnalysisPanel({
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="glass-panel"
+      className="bg-white/70 backdrop-blur-xl rounded-2xl border border-white/80 shadow-glass overflow-visible"
     >
       {/* Header */}
-      <div className="p-4 md:p-5 border-b border-white/60">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/25">
-              <Wallet className="text-white" size={22} />
+      <div className="p-4 md:p-5 border-b border-slate-100">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2 md:p-2.5 rounded-xl bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 flex-shrink-0">
+              <BarChart2 className="text-emerald-600" size={18} />
             </div>
-            <div>
-              <h3 className="text-vision-ink font-semibold text-base md:text-lg">Panel de Análisis</h3>
-              <p className="text-soft-slate text-xs md:text-sm">Crecimiento de Cartera</p>
+            <div className="min-w-0">
+              <h3 className="text-vision-ink font-semibold text-sm md:text-base">Panel de Análisis</h3>
+              <p className="text-soft-slate text-xs md:text-sm truncate">Crecimiento de Cartera</p>
             </div>
           </div>
 
-          {/* Selector de año */}
-          <div ref={yearDropdownRef} className="relative z-50">
-            <button
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="flex items-center gap-2 px-3 py-2 bg-white/80 hover:bg-white 
-                       rounded-xl border border-slate-200 transition-all duration-200 shadow-soft"
-            >
-              <Calendar size={14} className="text-plasma-blue" />
-              <span className="text-vision-ink font-medium text-sm">{selectedYear}</span>
-              <ChevronDown 
-                size={14} 
-                className={`text-soft-slate transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} 
-              />
-            </button>
-            
-            {isDropdownOpen && (
-              <div className="absolute right-0 top-full mt-1 w-max min-w-[120px] bg-white rounded-xl border border-slate-200 shadow-2xl z-[9999]">
-                {availableYears.map((year) => (
-                  <button
-                    key={year}
-                    onClick={() => {
-                      setSelectedYear(year);
-                      setIsDropdownOpen(false);
-                    }}
-                    className={`w-full px-4 py-3 text-left transition-all duration-150 first:rounded-t-xl last:rounded-b-xl flex items-center gap-2
-                              ${selectedYear === year 
-                                ? 'bg-plasma-blue/10 text-plasma-blue' 
-                                : 'text-vision-ink hover:bg-slate-50'}`}
-                  >
-                    <div 
-                      className="w-2.5 h-2.5 rounded-full ring-2 ring-white shadow-sm" 
-                      style={{ backgroundColor: yearColors[year] }}
-                    />
-                    <span className="font-medium">{year}</span>
-                  </button>
-                ))}
+          {/* Selectores de resumen y año */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Selector de resumen (solo si hay más de uno) */}
+            {config.summaries.length > 1 && (
+              <div ref={summaryDropdownRef} className="relative z-50 flex-shrink-0">
+                <button
+                  onClick={() => setIsSummaryDropdownOpen(!isSummaryDropdownOpen)}
+                  className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-2 bg-white/80 hover:bg-white 
+                           rounded-xl border border-slate-200 transition-all duration-200 min-w-[200px] md:min-w-[220px] shadow-soft"
+                >
+                  <Layers size={14} className="text-plasma-indigo flex-shrink-0" />
+                  <span className="text-vision-ink font-medium text-xs md:text-sm truncate max-w-[160px] md:max-w-[180px]">
+                    {config.summaries[selectedSummaryIndex]?.title?.replace(/^\d+\.\s*/, '') || 'Resumen'}
+                  </span>
+                  <ChevronDown 
+                    size={14} 
+                    className={`text-soft-slate ml-auto transition-transform duration-200 flex-shrink-0 ${isSummaryDropdownOpen ? 'rotate-180' : ''}`} 
+                  />
+                </button>
+                
+                {isSummaryDropdownOpen && (
+                  <div
+                    className="absolute left-0 top-full mt-1 w-max min-w-[200px] bg-white 
+                             rounded-xl border border-slate-200 shadow-2xl z-[9999]"
+                    style={{ position: 'absolute' }}
+                    >
+                    {config.summaries.map((summary, index) => (
+                      <button
+                        key={summary.id}
+                        onClick={() => {
+                          onSummaryChange(index);
+                          setIsSummaryDropdownOpen(false);
+                        }}
+                        className={`w-full px-4 py-3 text-left transition-all duration-150 first:rounded-t-xl last:rounded-b-xl
+                                  ${selectedSummaryIndex === index 
+                                    ? 'bg-plasma-blue/10 text-plasma-blue' 
+                                    : 'text-vision-ink hover:bg-slate-50 active:bg-slate-100'}`}
+                      >
+                        <span className="text-sm font-medium">{summary.title}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
+
+            {/* Selector de año */}
+            <div ref={yearDropdownRef} className="relative z-50 flex-shrink-0">
+              <button
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-2 bg-white/80 hover:bg-white 
+                         rounded-xl border border-slate-200 transition-all duration-200 min-w-[85px] md:min-w-[100px] shadow-soft"
+              >
+                <Calendar size={14} className="text-plasma-blue flex-shrink-0" />
+                <span className="text-vision-ink font-medium text-sm">{selectedYear || 'Año'}</span>
+                <ChevronDown 
+                  size={14} 
+                  className={`text-soft-slate ml-auto transition-transform duration-200 flex-shrink-0 ${isDropdownOpen ? 'rotate-180' : ''}`} 
+                />
+              </button>
+
+              {isDropdownOpen && (
+                <div className="absolute right-0 top-full mt-1 w-max min-w-[120px] bg-white rounded-xl border border-slate-200 shadow-2xl z-[9999]">
+                  {availableYears.map((year) => (
+                    <button
+                      key={year}
+                      onClick={() => {
+                        setSelectedYear(year);
+                        setIsDropdownOpen(false);
+                      }}
+                      className={`w-full px-4 py-3 text-left transition-all duration-150 first:rounded-t-xl last:rounded-b-xl flex items-center gap-2
+                                ${selectedYear === year 
+                                  ? 'bg-plasma-blue/10 text-plasma-blue' 
+                                  : 'text-vision-ink hover:bg-slate-50'}`}
+                    >
+                      <div 
+                        className="w-2.5 h-2.5 rounded-full ring-2 ring-white shadow-sm" 
+                        style={{ backgroundColor: yearColors[year] }}
+                      />
+                      <span className="font-medium">{year}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
