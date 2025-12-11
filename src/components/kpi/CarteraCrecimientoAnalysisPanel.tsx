@@ -37,6 +37,7 @@ import {
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { KpiDefinition } from '@/types/kpi-definitions';
+import { ExpandableDataTable } from './ExpandableDataTable';
 
 interface CarteraCrecimientoAnalysisPanelProps {
   config: KpiDefinition;
@@ -58,7 +59,7 @@ type CrecimientoRecord = {
   meta_anual?: number;
 };
 
-type ViewType = 'overview' | 'saldos' | 'crecimiento' | 'meta';
+type ViewType = 'overview' | 'monthly' | 'saldos' | 'crecimiento' | 'meta';
 
 export function CarteraCrecimientoAnalysisPanel({
   config,
@@ -231,6 +232,26 @@ export function CarteraCrecimientoAnalysisPanel({
     });
   }, [currentYearData]);
 
+  // Datos para ExpandableDataTable (formato estándar)
+  const monthlyChartData = useMemo(() => {
+    return MONTH_NAMES.map((month, index) => {
+      const monthNum = index + 1;
+      const entry: Record<string, unknown> = { mes: month, mesNum: monthNum };
+      
+      // Agregar datos de cada año disponible
+      availableYears.forEach((year: number) => {
+        const record = data.find(r => r.anio === year && r.mes === monthNum);
+        entry[`valor_${year}`] = record ? record.crecimiento : null;
+      });
+      
+      // Agregar meta mensual del año seleccionado
+      const currentRecord = data.find(r => r.anio === selectedYear && r.mes === monthNum);
+      entry['meta'] = currentRecord ? currentRecord.meta : null;
+      
+      return entry;
+    });
+  }, [availableYears, data, selectedYear]);
+
   // Comparativas mensuales
   const monthlyComparison = useMemo(() => {
     if (!metrics) return null;
@@ -263,6 +284,9 @@ export function CarteraCrecimientoAnalysisPanel({
     }
     return value.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 0 });
   };
+
+  // Formato de valor para ExpandableDataTable (porcentaje)
+  const formatValue = (value: number) => `${value.toFixed(2)}%`;
 
   // Vista de loading
   if (loading) {
@@ -389,6 +413,7 @@ export function CarteraCrecimientoAnalysisPanel({
         <div className="flex flex-wrap gap-1.5">
           {[
             { id: 'overview', label: 'Resumen', icon: Activity },
+            { id: 'monthly', label: 'Mensual', icon: Calendar },
             { id: 'saldos', label: 'Saldos', icon: Wallet },
             { id: 'crecimiento', label: 'Crecimiento', icon: TrendingUp },
             { id: 'meta', label: 'Meta Anual', icon: Target }
@@ -588,6 +613,80 @@ export function CarteraCrecimientoAnalysisPanel({
                   </ResponsiveContainer>
                 </div>
               </div>
+            </motion.div>
+          )}
+
+          {/* Vista Mensual con ExpandableDataTable */}
+          {activeView === 'monthly' && metrics && (
+            <motion.div
+              key="monthly"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="space-y-4"
+            >
+              {/* Gráfica de barras mensual */}
+              <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 border border-white/80 shadow-soft">
+                <h4 className="text-vision-ink font-medium text-sm mb-4">Crecimiento % por Mes - {selectedYear}</h4>
+                <div className="h-64 md:h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={monthlyChartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.3)" />
+                      <XAxis dataKey="mes" stroke="#64748b" fontSize={11} />
+                      <YAxis stroke="#64748b" fontSize={11} tickFormatter={(v: number) => `${v}%`} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                          border: '1px solid rgba(148,163,184,0.3)',
+                          borderRadius: '12px',
+                          boxShadow: '0 8px 32px rgba(0,0,0,0.12)'
+                        }}
+                        formatter={(value: number, name: string) => {
+                          if (name === 'meta') return [`${value?.toFixed(2)}%`, 'Meta'];
+                          const year = name.split('_')[1];
+                          return [`${value?.toFixed(2)}%`, year];
+                        }}
+                      />
+                      <Legend 
+                        formatter={(value: string) => {
+                          if (value === 'meta') return <span style={{ color: '#059669', fontWeight: 600 }}>Meta</span>;
+                          const year = value.split('_')[1];
+                          return <span style={{ color: yearColors[Number(year)], fontWeight: 600 }}>{year}</span>;
+                        }}
+                      />
+                      {availableYears.map((year) => (
+                        <Bar
+                          key={year}
+                          dataKey={`valor_${year}`}
+                          name={`valor_${year}`}
+                          fill={yearColors[year]}
+                          radius={[4, 4, 0, 0]}
+                          opacity={year === selectedYear ? 1 : 0.5}
+                        />
+                      ))}
+                      <ReferenceLine 
+                        y={metrics.metaCrecimiento} 
+                        stroke="#059669" 
+                        strokeDasharray="5 5" 
+                        strokeWidth={2}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Tabla con Drill-Down por Dimensión */}
+              <ExpandableDataTable
+                config={config}
+                selectedSummaryIndex={selectedSummaryIndex}
+                availableYears={availableYears}
+                selectedYear={selectedYear}
+                monthlyData={monthlyChartData}
+                viewType="monthly"
+                formatValue={formatValue}
+                higherIsBetter={true}
+                yearColors={yearColors}
+              />
             </motion.div>
           )}
 
