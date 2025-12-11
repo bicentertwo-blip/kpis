@@ -24,6 +24,7 @@ import { InsightsPanel } from './InsightsPanel';
 import { ExpandableDataTable } from './ExpandableDataTable';
 import { ProjectionTable } from './ProjectionTable';
 import { CarteraCrecimientoAnalysisPanel } from './CarteraCrecimientoAnalysisPanel';
+import { IMORAnalysisPanel } from './IMORAnalysisPanel';
 
 interface KpiAnalysisPanelProps {
   config: KpiDefinition;
@@ -599,6 +600,18 @@ export function KpiAnalysisPanel({
   if (selectedSummary?.id === 'resumen-crecimiento') {
     return (
       <CarteraCrecimientoAnalysisPanel 
+        config={config}
+        filters={initialFilters}
+        selectedSummaryIndex={selectedSummaryIndex}
+        onSummaryChange={setSelectedSummaryIndex}
+      />
+    );
+  }
+
+  // Panel especializado para IMOR - reemplaza completamente el panel estándar
+  if (selectedSummary?.id === 'resumen-imor') {
+    return (
+      <IMORAnalysisPanel 
         config={config}
         filters={initialFilters}
         selectedSummaryIndex={selectedSummaryIndex}
