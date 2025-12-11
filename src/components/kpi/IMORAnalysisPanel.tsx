@@ -35,7 +35,9 @@ import {
   ArrowDownRight,
   BarChart2,
   Layers,
-  ShieldAlert
+  ShieldAlert,
+  Building2,
+  Package
 } from 'lucide-react';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -59,7 +61,19 @@ type IMORRecord = {
   meta_anual?: number;
 };
 
-type ViewType = 'overview' | 'tendencia' | 'cumplimiento' | 'meta';
+type IMORDetalleRecord = {
+  anio: number;
+  mes: number;
+  entidad?: string;
+  plaza?: string;
+  producto?: string;
+  cartera_total: number;
+  cartera_vencida: number;
+  imor: number;
+  meta: number;
+};
+
+type ViewType = 'overview' | 'tendencia' | 'dimensiones' | 'cumplimiento' | 'meta';
 
 export function IMORAnalysisPanel({
   config,
@@ -69,10 +83,12 @@ export function IMORAnalysisPanel({
 }: IMORAnalysisPanelProps) {
   const [activeView, setActiveView] = useState<ViewType>('overview');
   const [data, setData] = useState<IMORRecord[]>([]);
+  const [detalleData, setDetalleData] = useState<IMORDetalleRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState<number>(filters.anio);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSummaryDropdownOpen, setIsSummaryDropdownOpen] = useState(false);
+  const [selectedDimension, setSelectedDimension] = useState<'plaza' | 'producto'>('plaza');
   
   const yearDropdownRef = useRef<HTMLDivElement>(null);
   const summaryDropdownRef = useRef<HTMLDivElement>(null);
@@ -96,23 +112,36 @@ export function IMORAnalysisPanel({
     };
   }, []);
 
-  // Cargar datos
+  // Cargar datos de resumen y detalle
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       try {
-        const { data: result, error } = await supabase
+        // Cargar datos de resumen
+        const { data: resumenResult, error: resumenError } = await supabase
           .from('kpi_colocacion_resumen_2')
           .select('*')
           .eq('is_current', true)
           .order('anio', { ascending: true })
           .order('mes', { ascending: true });
 
-        if (error) throw error;
-        setData((result || []) as IMORRecord[]);
+        if (resumenError) throw resumenError;
+        setData((resumenResult || []) as IMORRecord[]);
+
+        // Cargar datos de detalle
+        const { data: detalleResult, error: detalleError } = await supabase
+          .from('kpi_colocacion_detalle_2')
+          .select('*')
+          .eq('is_current', true)
+          .order('anio', { ascending: true })
+          .order('mes', { ascending: true });
+
+        if (detalleError) throw detalleError;
+        setDetalleData((detalleResult || []) as IMORDetalleRecord[]);
       } catch (err) {
         console.error('Error loading IMOR data:', err);
         setData([]);
+        setDetalleData([]);
       } finally {
         setLoading(false);
       }
@@ -261,6 +290,78 @@ export function IMORAnalysisPanel({
     return comparisons;
   }, [metrics, availableYears, data, selectedYear]);
 
+  // Datos del detalle filtrados por año y mes seleccionado
+  const currentDetalleData = useMemo(() => {
+    if (!metrics) return [];
+    return detalleData.filter(r => r.anio === selectedYear && r.mes === metrics.ultimoMes);
+  }, [detalleData, selectedYear, metrics]);
+
+  // Análisis por dimensión (plaza o producto)
+  const dimensionAnalysis = useMemo(() => {
+    if (currentDetalleData.length === 0) return [];
+    
+    const grouped: Record<string, { 
+      nombre: string;
+      carteraTotal: number;
+      carteraVencida: number;
+      imor: number;
+      meta: number;
+      registros: number;
+    }> = {};
+    
+    currentDetalleData.forEach(record => {
+      const key = selectedDimension === 'plaza' 
+        ? (record.plaza || 'Sin Plaza') 
+        : (record.producto || 'Sin Producto');
+      
+      if (!grouped[key]) {
+        grouped[key] = {
+          nombre: key,
+          carteraTotal: 0,
+          carteraVencida: 0,
+          imor: 0,
+          meta: record.meta || 0,
+          registros: 0
+        };
+      }
+      
+      grouped[key].carteraTotal += record.cartera_total || 0;
+      grouped[key].carteraVencida += record.cartera_vencida || 0;
+      grouped[key].imor += record.imor || 0;
+      grouped[key].registros += 1;
+    });
+    
+    // Calcular IMOR promedio y ordenar de mayor a menor IMOR
+    return Object.values(grouped)
+      .map(g => ({
+        ...g,
+        imor: g.registros > 0 ? g.imor / g.registros : 0,
+        cumple: (g.registros > 0 ? g.imor / g.registros : 0) <= g.meta
+      }))
+      .sort((a, b) => b.imor - a.imor);
+  }, [currentDetalleData, selectedDimension]);
+
+  // Top 5 con mayor IMOR (más problemáticos)
+  const topProblematicos = useMemo(() => {
+    return dimensionAnalysis.slice(0, 5);
+  }, [dimensionAnalysis]);
+
+  // Top 5 con menor IMOR (mejor desempeño)
+  const topMejorDesempeno = useMemo(() => {
+    return [...dimensionAnalysis].sort((a, b) => a.imor - b.imor).slice(0, 5);
+  }, [dimensionAnalysis]);
+
+  // Formato de moneda
+  const formatCurrency = (value: number) => {
+    if (value >= 1000000000) {
+      return `$${(value / 1000000000).toFixed(2)}B`;
+    }
+    if (value >= 1000000) {
+      return `$${(value / 1000000).toFixed(2)}M`;
+    }
+    return value.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 0 });
+  };
+
   // Vista de loading
   if (loading) {
     return (
@@ -387,6 +488,7 @@ export function IMORAnalysisPanel({
           {[
             { id: 'overview', label: 'Resumen', icon: Activity },
             { id: 'tendencia', label: 'Tendencia', icon: TrendingDown },
+            { id: 'dimensiones', label: 'Por Dimensión', icon: Building2 },
             { id: 'cumplimiento', label: 'Cumplimiento', icon: CheckCircle2 },
             { id: 'meta', label: 'Meta Anual', icon: Target }
           ].map(tab => (
@@ -720,6 +822,260 @@ export function IMORAnalysisPanel({
                   </ResponsiveContainer>
                 </div>
               </div>
+            </motion.div>
+          )}
+
+          {/* Vista Por Dimensión */}
+          {activeView === 'dimensiones' && metrics && (
+            <motion.div
+              key="dimensiones"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="space-y-4"
+            >
+              {/* Selector de dimensión */}
+              <div className="flex items-center gap-2">
+                <span className="text-soft-slate text-sm">Agrupar por:</span>
+                <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
+                  <button
+                    onClick={() => setSelectedDimension('plaza')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200
+                              ${selectedDimension === 'plaza' 
+                                ? 'bg-white text-vision-ink shadow-sm' 
+                                : 'text-soft-slate hover:text-vision-ink'}`}
+                  >
+                    <Building2 size={14} />
+                    Plaza
+                  </button>
+                  <button
+                    onClick={() => setSelectedDimension('producto')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200
+                              ${selectedDimension === 'producto' 
+                                ? 'bg-white text-vision-ink shadow-sm' 
+                                : 'text-soft-slate hover:text-vision-ink'}`}
+                  >
+                    <Package size={14} />
+                    Producto
+                  </button>
+                </div>
+                <span className="text-soft-slate text-xs ml-2">
+                  ({FULL_MONTH_NAMES[metrics.ultimoMes - 1]} {selectedYear})
+                </span>
+              </div>
+
+              {currentDetalleData.length === 0 ? (
+                <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-8 border border-white/80 shadow-soft text-center">
+                  <Package size={48} className="text-slate-300 mx-auto mb-4" />
+                  <h4 className="text-soft-slate text-lg mb-2">Sin datos de detalle</h4>
+                  <p className="text-soft-slate/60 text-sm">
+                    Importa datos en la pestaña "Importar" → "Detalle IMOR" para ver el análisis por {selectedDimension}.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Top Problemáticos vs Top Mejor Desempeño */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {/* Mayor IMOR (Más problemáticos) */}
+                    <div className="bg-gradient-to-br from-rose-50/80 to-red-50/50 rounded-2xl p-4 border border-rose-200 shadow-soft">
+                      <h4 className="text-rose-700 font-semibold text-sm mb-3 flex items-center gap-2">
+                        <AlertTriangle size={16} />
+                        Mayor IMOR (Requiere Atención)
+                      </h4>
+                      <div className="space-y-2">
+                        {topProblematicos.map((item, index) => (
+                          <div 
+                            key={item.nombre}
+                            className="flex items-center justify-between p-2.5 bg-white/70 rounded-xl border border-rose-100"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold 
+                                            ${index === 0 ? 'bg-rose-500 text-white' : 'bg-rose-100 text-rose-600'}`}>
+                                {index + 1}
+                              </span>
+                              <span className="text-vision-ink text-sm font-medium truncate">{item.nombre}</span>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <span className={`text-sm font-bold ${item.cumple ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                {item.imor.toFixed(2)}%
+                              </span>
+                              {!item.cumple && <AlertTriangle size={14} className="text-rose-500" />}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Menor IMOR (Mejor desempeño) */}
+                    <div className="bg-gradient-to-br from-emerald-50/80 to-teal-50/50 rounded-2xl p-4 border border-emerald-200 shadow-soft">
+                      <h4 className="text-emerald-700 font-semibold text-sm mb-3 flex items-center gap-2">
+                        <CheckCircle2 size={16} />
+                        Menor IMOR (Mejor Desempeño)
+                      </h4>
+                      <div className="space-y-2">
+                        {topMejorDesempeno.map((item, index) => (
+                          <div 
+                            key={item.nombre}
+                            className="flex items-center justify-between p-2.5 bg-white/70 rounded-xl border border-emerald-100"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold 
+                                            ${index === 0 ? 'bg-emerald-500 text-white' : 'bg-emerald-100 text-emerald-600'}`}>
+                                {index + 1}
+                              </span>
+                              <span className="text-vision-ink text-sm font-medium truncate">{item.nombre}</span>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <span className="text-sm font-bold text-emerald-600">
+                                {item.imor.toFixed(2)}%
+                              </span>
+                              <CheckCircle2 size={14} className="text-emerald-500" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tabla completa de dimensiones */}
+                  <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 border border-white/80 shadow-soft">
+                    <h4 className="text-vision-ink font-medium text-sm mb-4">
+                      Detalle por {selectedDimension === 'plaza' ? 'Plaza' : 'Producto'} 
+                      <span className="text-soft-slate font-normal ml-2">({dimensionAnalysis.length} registros)</span>
+                    </h4>
+                    <div className="overflow-x-auto -mx-4 px-4">
+                      <table className="w-full min-w-[600px]">
+                        <thead>
+                          <tr className="border-b border-slate-200">
+                            <th className="text-left py-2 px-3 text-soft-slate text-xs font-medium uppercase tracking-wider">
+                              {selectedDimension === 'plaza' ? 'Plaza' : 'Producto'}
+                            </th>
+                            <th className="text-right py-2 px-3 text-soft-slate text-xs font-medium uppercase tracking-wider">
+                              Cartera Total
+                            </th>
+                            <th className="text-right py-2 px-3 text-soft-slate text-xs font-medium uppercase tracking-wider">
+                              Cartera Vencida
+                            </th>
+                            <th className="text-right py-2 px-3 text-soft-slate text-xs font-medium uppercase tracking-wider">
+                              IMOR
+                            </th>
+                            <th className="text-right py-2 px-3 text-soft-slate text-xs font-medium uppercase tracking-wider">
+                              Meta
+                            </th>
+                            <th className="text-center py-2 px-3 text-soft-slate text-xs font-medium uppercase tracking-wider">
+                              Estado
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {dimensionAnalysis.map((item) => (
+                            <tr 
+                              key={item.nombre}
+                              className={`transition-colors ${item.cumple ? 'hover:bg-emerald-50/50' : 'hover:bg-rose-50/50'}`}
+                            >
+                              <td className="py-2.5 px-3">
+                                <span className="text-vision-ink text-sm font-medium">{item.nombre}</span>
+                              </td>
+                              <td className="py-2.5 px-3 text-right">
+                                <span className="text-vision-ink text-sm">{formatCurrency(item.carteraTotal)}</span>
+                              </td>
+                              <td className="py-2.5 px-3 text-right">
+                                <span className="text-vision-ink text-sm">{formatCurrency(item.carteraVencida)}</span>
+                              </td>
+                              <td className="py-2.5 px-3 text-right">
+                                <span className={`text-sm font-bold ${item.cumple ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                  {item.imor.toFixed(2)}%
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 text-right">
+                                <span className="text-soft-slate text-sm">≤ {item.meta.toFixed(2)}%</span>
+                              </td>
+                              <td className="py-2.5 px-3 text-center">
+                                {item.cumple ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">
+                                    <CheckCircle2 size={12} />
+                                    Cumple
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-100 text-rose-700 rounded-full text-xs font-medium">
+                                    <AlertTriangle size={12} />
+                                    Excede
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Gráfica de barras comparativa */}
+                  <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 border border-white/80 shadow-soft">
+                    <h4 className="text-vision-ink font-medium text-sm mb-4">
+                      Comparativa de IMOR por {selectedDimension === 'plaza' ? 'Plaza' : 'Producto'}
+                    </h4>
+                    <div className="h-72 md:h-80">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart 
+                          data={dimensionAnalysis.slice(0, 10)} 
+                          layout="vertical"
+                          margin={{ top: 10, right: 30, left: 100, bottom: 0 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.3)" />
+                          <XAxis 
+                            type="number" 
+                            stroke="#64748b" 
+                            fontSize={11} 
+                            tickFormatter={(v: number) => `${v}%`}
+                          />
+                          <YAxis 
+                            type="category" 
+                            dataKey="nombre" 
+                            stroke="#64748b" 
+                            fontSize={11}
+                            width={90}
+                            tick={{ fontSize: 10 }}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                              border: '1px solid rgba(148,163,184,0.3)',
+                              borderRadius: '12px',
+                              boxShadow: '0 8px 32px rgba(0,0,0,0.12)'
+                            }}
+                            formatter={(value: number, name: string) => [
+                              `${value?.toFixed(2) || '-'}%`, 
+                              name === 'imor' ? 'IMOR' : 'Meta'
+                            ]}
+                          />
+                          <Legend />
+                          <Bar 
+                            dataKey="imor" 
+                            name="IMOR" 
+                            radius={[0, 4, 4, 0]}
+                          >
+                            {dimensionAnalysis.slice(0, 10).map((entry, index) => (
+                              <Bar
+                                key={`bar-${index}`}
+                                dataKey="imor"
+                                fill={entry.cumple ? '#059669' : '#dc2626'}
+                              />
+                            ))}
+                          </Bar>
+                          <ReferenceLine 
+                            x={metrics.metaMensual} 
+                            stroke="#059669" 
+                            strokeDasharray="5 5" 
+                            strokeWidth={2}
+                            label={{ value: 'Meta', position: 'top', fill: '#059669', fontSize: 11 }}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </>
+              )}
             </motion.div>
           )}
 
