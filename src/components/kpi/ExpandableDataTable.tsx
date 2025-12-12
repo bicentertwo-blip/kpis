@@ -182,7 +182,7 @@ export function ExpandableDataTable({
     const excludeFields = ['anio', 'mes', 'meta', 'is_current', 'owner_id', 'id', 'created_at',
                           ...Object.keys(DIMENSION_HIERARCHY)];
     // Campos que típicamente son porcentajes/tasas/índices
-    const percentagePatterns = ['indice', 'ratio', 'porcentaje', 'tasa', 'roe', 'roa', 'margen', 'nps', 'satisfaccion'];
+    const percentagePatterns = ['indice', 'ratio', 'porcentaje', 'tasa', 'roe', 'roa', 'margen', 'nps', 'satisfaccion', 'imor', 'mora'];
     // Campos que pueden usarse como peso para promedios ponderados
     const weightPatterns = ['total', 'monto', 'cartera', 'creditos', 'clientes', 'operaciones', 'cantidad'];
     
