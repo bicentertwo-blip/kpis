@@ -21,6 +21,7 @@ import { KpiAnalysisPanel } from './KpiAnalysisPanel'
 import { InnovacionAnalysisPanel } from './InnovacionAnalysisPanel'
 import { RiskManagementAnalysisPanel } from './RiskManagementAnalysisPanel'
 import { GovernanceAnalysisPanel } from './GovernanceAnalysisPanel'
+import { RoeRoaAnalysisPanel } from './RoeRoaAnalysisPanel'
 import { KpiHeaderNew } from './KpiHeaderNew'
 import { GlassCard } from '@/components/base/GlassCard'
 import { Button } from '@/components/base/Button'
@@ -346,6 +347,11 @@ export const KpiPageTemplate = ({ config }: KpiPageTemplateProps) => {
               />
             ) : config.id === 'gobierno-corporativo' ? (
               <GovernanceAnalysisPanel 
+                config={config}
+                filters={{ anio: selectedYear, mes: selectedMonth }}
+              />
+            ) : (config.id === 'roe-roa' || config.id === 'rentabilidad-operativa') ? (
+              <RoeRoaAnalysisPanel 
                 config={config}
                 filters={{ anio: selectedYear, mes: selectedMonth }}
               />
