@@ -610,7 +610,7 @@ export function IMORAnalysisPanel({
                         }}
                         formatter={(value: number, name: string) => [
                           `${value?.toFixed(2) || '-'}%`, 
-                          name === 'imor' ? 'IMOR' : 'Meta'
+                          name === 'IMOR' ? 'IMOR' : 'Meta'
                         ]}
                       />
                       <Legend />
