@@ -47,8 +47,23 @@ const fieldTypeConfig: Record<KpiField['type'], { icon: string; prefix?: string 
 }
 
 export const DynamicForm = ({ fields, values, onChange, disabled }: DynamicFormProps) => {
+  // Track which fields have been touched (blurred)
+  const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set())
+
+  const handleBlur = useCallback((fieldId: string) => {
+    setTouchedFields(prev => new Set(prev).add(fieldId))
+  }, [])
+
+  const isFieldEmpty = useCallback((fieldId: string) => {
+    const value = values[fieldId]
+    return value === undefined || value === null || value === ''
+  }, [values])
+
   const renderField = (field: KpiField) => {
     const config = fieldTypeConfig[field.type]
+    const isTouched = touchedFields.has(field.id)
+    const isEmpty = isFieldEmpty(field.id)
+    const showError = field.required && isTouched && isEmpty
     
     return (
       <motion.div
@@ -57,15 +72,20 @@ export const DynamicForm = ({ fields, values, onChange, disabled }: DynamicFormP
         className={cn(
           'group relative rounded-2xl lg:rounded-3xl',
           'bg-white/50 backdrop-blur-xl',
-          'border border-white/60 hover:border-white/80',
+          'border transition-all duration-300',
+          showError 
+            ? 'border-rose-300 bg-rose-50/30' 
+            : 'border-white/60 hover:border-white/80',
           'shadow-soft hover:shadow-glass',
-          'transition-all duration-300',
           'p-4 sm:p-5 lg:p-6',
           field.type === 'long-text' && 'sm:col-span-2'
         )}
       >
         {/* Field type indicator */}
-        <div className="absolute top-3 right-3 sm:top-4 sm:right-4 w-8 h-8 rounded-lg bg-plasma-blue/5 flex items-center justify-center text-xs font-mono text-plasma-blue/60">
+        <div className={cn(
+          "absolute top-3 right-3 sm:top-4 sm:right-4 w-8 h-8 rounded-lg flex items-center justify-center text-xs font-mono",
+          showError ? "bg-rose-100 text-rose-500" : "bg-plasma-blue/5 text-plasma-blue/60"
+        )}>
           {config.icon}
         </div>
 
@@ -84,16 +104,18 @@ export const DynamicForm = ({ fields, values, onChange, disabled }: DynamicFormP
             rows={4}
             className={cn(
               'w-full resize-none rounded-xl lg:rounded-2xl',
-              'border border-white/60 bg-white/60',
+              'border bg-white/60',
               'px-4 py-3 text-sm sm:text-base text-vision-ink',
               'placeholder:text-soft-slate/50',
               'focus:border-plasma-blue/40 focus:bg-white/80 focus:shadow-glow-sm',
               'focus:outline-none transition-all duration-200',
-              'disabled:opacity-50 disabled:cursor-not-allowed'
+              'disabled:opacity-50 disabled:cursor-not-allowed',
+              showError ? 'border-rose-300' : 'border-white/60'
             )}
             placeholder={field.placeholder}
             value={(values[field.id] as string) ?? ''}
             onChange={(event) => onChange(field.id, event.target.value)}
+            onBlur={() => handleBlur(field.id)}
             disabled={disabled}
           />
         ) : field.type === 'currency' || field.type === 'percentage' || field.type === 'number' ? (
@@ -101,7 +123,9 @@ export const DynamicForm = ({ fields, values, onChange, disabled }: DynamicFormP
             field={field}
             value={values[field.id]}
             onChange={onChange}
+            onBlur={() => handleBlur(field.id)}
             disabled={disabled}
+            hasError={showError}
           />
         ) : (
           <div className="relative">
@@ -109,20 +133,32 @@ export const DynamicForm = ({ fields, values, onChange, disabled }: DynamicFormP
               type="text"
               className={cn(
                 'w-full rounded-xl lg:rounded-2xl',
-                'border border-white/60 bg-white/60',
+                'border bg-white/60',
                 'py-3 text-sm sm:text-base text-vision-ink',
                 'px-4',
                 'placeholder:text-soft-slate/50',
                 'focus:border-plasma-blue/40 focus:bg-white/80 focus:shadow-glow-sm',
                 'focus:outline-none transition-all duration-200',
-                'disabled:opacity-50 disabled:cursor-not-allowed'
+                'disabled:opacity-50 disabled:cursor-not-allowed',
+                showError ? 'border-rose-300' : 'border-white/60'
               )}
               placeholder={field.placeholder}
               value={(values[field.id] as string | number | undefined) ?? ''}
               onChange={(event) => onChange(field.id, event.target.value)}
+              onBlur={() => handleBlur(field.id)}
               disabled={disabled}
             />
           </div>
+        )}
+
+        {/* Error message */}
+        {showError && (
+          <p className="mt-2 text-xs sm:text-sm text-rose-600 flex items-center gap-1.5">
+            <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            {field.requiredMessage || `${field.label} es un campo obligatorio`}
+          </p>
         )}
       </motion.div>
     )
@@ -145,10 +181,12 @@ interface FormattedNumberInputProps {
   field: KpiField
   value: unknown
   onChange: (fieldId: string, value: unknown) => void
+  onBlur?: () => void
   disabled?: boolean
+  hasError?: boolean
 }
 
-const FormattedNumberInput = ({ field, value, onChange, disabled }: FormattedNumberInputProps) => {
+const FormattedNumberInput = ({ field, value, onChange, onBlur, disabled, hasError }: FormattedNumberInputProps) => {
   const [isFocused, setIsFocused] = useState(false)
   
   // Valor formateado para mostrar
@@ -177,6 +215,7 @@ const FormattedNumberInput = ({ field, value, onChange, disabled }: FormattedNum
 
   const handleBlur = () => {
     setIsFocused(false)
+    onBlur?.()
   }
 
   const handleFocus = () => {
@@ -195,14 +234,15 @@ const FormattedNumberInput = ({ field, value, onChange, disabled }: FormattedNum
         inputMode="decimal"
         className={cn(
           'w-full rounded-xl lg:rounded-2xl',
-          'border border-white/60 bg-white/60',
+          'border bg-white/60',
           'py-3 text-sm sm:text-base text-vision-ink',
           field.type === 'currency' ? 'pl-8 pr-4' : field.type === 'percentage' ? 'pl-4 pr-8' : 'px-4',
           'placeholder:text-soft-slate/50',
           'focus:border-plasma-blue/40 focus:bg-white/80 focus:shadow-glow-sm',
           'focus:outline-none transition-all duration-200',
           'disabled:opacity-50 disabled:cursor-not-allowed',
-          'tabular-nums'
+          'tabular-nums',
+          hasError ? 'border-rose-300' : 'border-white/60'
         )}
         placeholder={field.placeholder}
         value={displayValue()}

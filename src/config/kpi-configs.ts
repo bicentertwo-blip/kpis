@@ -1193,7 +1193,8 @@ export const CUMPLIMIENTO_CONFIG: KpiDefinition = {
           type: 'long-text',
           placeholder: 'Detalle de las observaciones recibidas...',
           description: 'Descripción detallada de las observaciones',
-          required: false,
+          required: true,
+          requiredMessage: 'Es indispensable proporcionar una descripción detallada de las observaciones regulatorias',
         },
         {
           id: 'meta',

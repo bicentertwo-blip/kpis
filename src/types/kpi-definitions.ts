@@ -36,6 +36,7 @@ export interface FieldDefinition {
   placeholder?: string
   description?: string
   required?: boolean
+  requiredMessage?: string
   options?: FieldOption[] // Para campos tipo select
   min?: number
   max?: number

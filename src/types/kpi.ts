@@ -22,6 +22,7 @@ export interface KpiField {
   description?: string
   type: 'currency' | 'percentage' | 'number' | 'text' | 'long-text'
   required?: boolean
+  requiredMessage?: string
   unit?: string
 }
 
