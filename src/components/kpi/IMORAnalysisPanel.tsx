@@ -610,7 +610,7 @@ export function IMORAnalysisPanel({
                         }}
                         formatter={(value: number, name: string) => [
                           `${value?.toFixed(2) || '-'}%`, 
-                          name === 'imor' ? 'IMOR' : 'IMOR'
+                          name === 'imor' ? 'IMOR' : 'Meta'
                         ]}
                       />
                       <Legend />
@@ -911,7 +911,7 @@ export function IMORAnalysisPanel({
                         }}
                         formatter={(value: number, name: string) => [
                           `${value?.toFixed(2) || '-'}%`, 
-                          name === 'imor' ? 'IMOR' : 'Meta Anual'
+                          name === 'imor' ? 'IMOR' : 'IMOR'
                         ]}
                       />
                       <Legend />
