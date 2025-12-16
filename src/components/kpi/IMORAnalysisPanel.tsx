@@ -130,7 +130,7 @@ export function IMORAnalysisPanel({
 
   // Colores para años
   const yearColors: Record<number, string> = useMemo(() => {
-    const palette = ['#dc2626', '#2563eb', '#d97706', '#059669', '#7c3aed'];
+    const palette = ['#4F46E5', '#2563eb', '#d97706', '#059669', '#7c3aed'];
     const colors: Record<number, string> = {};
     availableYears.forEach((year, index) => {
       colors[year] = palette[index % palette.length];
@@ -310,8 +310,8 @@ export function IMORAnalysisPanel({
       <div className="p-4 md:p-5 border-b border-slate-100">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="p-2 md:p-2.5 rounded-xl bg-gradient-to-br from-rose-500/10 to-red-500/10 border border-rose-500/20 flex-shrink-0">
-              <ShieldAlert className="text-rose-600" size={18} />
+            <div className="p-2 md:p-2.5 rounded-xl bg-gradient-to-br from-indigo-500/10 to-violet-500/10 border border-indigo-500/20 flex-shrink-0">
+              <ShieldAlert className="text-indigo-600" size={18} />
             </div>
             <div className="min-w-0">
               <h3 className="text-vision-ink font-semibold text-sm md:text-base">Panel de Análisis</h3>
@@ -617,7 +617,7 @@ export function IMORAnalysisPanel({
                       <Bar 
                         dataKey="imor" 
                         name="IMOR" 
-                        fill="#dc2626" 
+                        fill="#4F46E5" 
                         radius={[4, 4, 0, 0]}
                         opacity={0.85}
                       />
@@ -917,8 +917,8 @@ export function IMORAnalysisPanel({
                       <Legend />
                       <defs>
                         <linearGradient id="gradient-imor-area" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#dc2626" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#dc2626" stopOpacity={0} />
+                          <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#4F46E5" stopOpacity={0} />
                         </linearGradient>
                       </defs>
                       <Area 
@@ -926,7 +926,7 @@ export function IMORAnalysisPanel({
                         dataKey="imor" 
                         name="IMOR" 
                         fill="url(#gradient-imor-area)"
-                        stroke="#dc2626"
+                        stroke="#4F46E5"
                         strokeWidth={2}
                       />
                       <ReferenceLine 
