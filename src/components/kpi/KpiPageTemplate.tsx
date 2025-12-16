@@ -350,7 +350,7 @@ export const KpiPageTemplate = ({ config }: KpiPageTemplateProps) => {
                 config={config}
                 filters={{ anio: selectedYear, mes: selectedMonth }}
               />
-            ) : (config.id === 'roe-roa' || config.id === 'rentabilidad-operativa') ? (
+            ) : config.id === 'roe-roa' ? (
               <RoeRoaAnalysisPanel 
                 config={config}
                 filters={{ anio: selectedYear, mes: selectedMonth }}
