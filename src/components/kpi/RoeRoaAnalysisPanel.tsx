@@ -93,27 +93,50 @@ export function RoeRoaAnalysisPanel({ filters }: RoeRoaAnalysisPanelProps) {
     const loadData = async () => {
       setLoading(true);
       try {
-        // Cargar resumen
+        // Cargar resumen - ordenamos por updated_at para tomar el más reciente por mes
         const { data: resumen, error: resumenError } = await supabase
           .from('kpi_roe_roa_resumen')
           .select('*')
           .eq('is_current', true)
-          .order('anio', { ascending: true })
-          .order('mes', { ascending: true });
+          .order('updated_at', { ascending: false });
 
         if (resumenError) throw resumenError;
-        setData((resumen || []) as RoeRoaRecord[]);
+        
+        // Agrupar por año/mes y tomar solo el registro más reciente de cada combinación
+        const groupedData = new Map<string, RoeRoaRecord>();
+        for (const record of (resumen || [])) {
+          const key = `${record.anio}-${record.mes}`;
+          // Como ya viene ordenado por updated_at desc, el primero es el más reciente
+          if (!groupedData.has(key)) {
+            groupedData.set(key, record as RoeRoaRecord);
+          }
+        }
+        
+        // Convertir a array y ordenar por año/mes
+        const uniqueData = Array.from(groupedData.values())
+          .sort((a, b) => a.anio === b.anio ? a.mes - b.mes : a.anio - b.anio);
+        
+        setData(uniqueData);
 
-        // Cargar detalle por entidad
+        // Cargar detalle por entidad - mismo tratamiento
         const { data: detalle, error: detalleError } = await supabase
           .from('kpi_roe_roa_detalle')
-          .select('anio, mes, entidad, roe_operativo, roe_neto, roa_operativo, roa_neto')
+          .select('anio, mes, entidad, roe_operativo, roe_neto, roa_operativo, roa_neto, updated_at')
           .eq('is_current', true)
-          .order('anio', { ascending: true })
-          .order('mes', { ascending: true });
+          .order('updated_at', { ascending: false });
 
         if (!detalleError && detalle) {
-          setDetailData(detalle as DetailRecord[]);
+          // Agrupar por año/mes/entidad
+          const groupedDetail = new Map<string, DetailRecord>();
+          for (const record of detalle) {
+            const key = `${record.anio}-${record.mes}-${record.entidad}`;
+            if (!groupedDetail.has(key)) {
+              groupedDetail.set(key, record as DetailRecord);
+            }
+          }
+          const uniqueDetail = Array.from(groupedDetail.values())
+            .sort((a, b) => a.anio === b.anio ? a.mes - b.mes : a.anio - b.anio);
+          setDetailData(uniqueDetail);
         }
       } catch (err) {
         console.error('Error loading ROE/ROA data:', err);
