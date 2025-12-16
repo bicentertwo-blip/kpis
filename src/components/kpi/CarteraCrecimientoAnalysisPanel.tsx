@@ -589,7 +589,7 @@ export function CarteraCrecimientoAnalysisPanel({
                         }}
                         formatter={(value: number, name: string) => [
                           `${value?.toFixed(2) || '-'}%`, 
-                          name === 'crecimiento' ? 'Crecimiento' : 'Meta'
+                          name === 'crecimiento' ? 'Crecimiento' : 'Crecimiento'
                         ]}
                       />
                       <Legend />
@@ -604,7 +604,7 @@ export function CarteraCrecimientoAnalysisPanel({
                         type="monotone" 
                         dataKey="meta" 
                         name="Meta"
-                        stroke="#dc2626" 
+                        stroke="#524AE6" 
                         strokeWidth={2}
                         strokeDasharray="5 5"
                         dot={false}
